@@ -9,6 +9,7 @@ Runs twice daily via GitHub Actions:
   - Mon-Fri 20:00 SGT (12:00 UTC)
 """
 import datetime
+import html
 import json
 import os
 import sys
@@ -47,12 +48,16 @@ def _pick_news_fields(item):
     """yfinance returns two shapes depending on version. Normalize them."""
     title = item.get("title")
     publisher = item.get("publisher")
+    url = item.get("link")
     if not title and isinstance(item.get("content"), dict):
         c = item["content"]
         title = c.get("title")
         provider = c.get("provider") or {}
         publisher = provider.get("displayName")
-    return title, publisher
+        click = c.get("clickThroughUrl") or {}
+        canonical = c.get("canonicalUrl") or {}
+        url = click.get("url") or canonical.get("url") or url
+    return title, publisher, url
 
 
 def fetch_snapshot(ticker, current_px):
@@ -103,10 +108,10 @@ def fetch_snapshot(ticker, current_px):
     except Exception:
         raw_news = []
     for item in raw_news:
-        title, publisher = _pick_news_fields(item)
+        title, publisher, url = _pick_news_fields(item)
         if not title:
             continue
-        out["news"].append(f"{title} ({publisher})" if publisher else title)
+        out["news"].append({"title": title, "publisher": publisher, "url": url})
         if len(out["news"]) >= 2:
             break
 
@@ -169,8 +174,14 @@ def build_message(portfolio, prices, snapshots, date_str, session_label):
             lines.append(f"\U0001f9e0 {snap['analyst']}")
         if snap.get("earnings"):
             lines.append(f"\U0001f4c5 {snap['earnings']}")
-        for headline in snap.get("news", []):
-            lines.append(f"\U0001f4f0 {headline}")
+        for n in snap.get("news", []):
+            title = html.escape(n["title"])
+            pub = f" ({html.escape(n['publisher'])})" if n.get("publisher") else ""
+            if n.get("url"):
+                url = html.escape(n["url"], quote=True)
+                lines.append(f"\U0001f4f0 <a href=\"{url}\">{title}</a>{pub}")
+            else:
+                lines.append(f"\U0001f4f0 {title}{pub}")
 
     return "\n".join(lines)
 
