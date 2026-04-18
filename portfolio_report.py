@@ -175,6 +175,26 @@ def build_message(portfolio, prices, snapshots, date_str, session_label):
     return "\n".join(lines)
 
 
+def _explain_tg_error(result):
+    """Turn a Telegram API error into actionable guidance."""
+    if not result:
+        return "No response from Telegram API."
+    desc = (result.get("description") or "").lower()
+    code = result.get("error_code")
+    if "chat not found" in desc:
+        return (
+            f"PORTFOLIO_CHAT_ID={CHAT_ID!r} is wrong, or the bot is not a member "
+            f"of that chat. Fix: add the bot to the chat, send one message, then "
+            f"visit https://api.telegram.org/bot<TOKEN>/getUpdates to read the "
+            f"correct chat.id (groups are negative, supergroups start with -100)."
+        )
+    if "unauthorized" in desc or code == 401:
+        return "TELEGRAM_BOT_TOKEN is invalid or revoked. Regenerate via @BotFather."
+    if "bot was kicked" in desc or "bot is not a member" in desc:
+        return "Bot was removed from the chat. Re-add it and try again."
+    return f"Telegram returned: {result}"
+
+
 def post(text):
     MAX = 4000
     if len(text) <= MAX:
@@ -203,11 +223,40 @@ def post(text):
     return last
 
 
+def preflight():
+    """Verify bot token and chat before doing any work."""
+    try:
+        me = requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/getMe", timeout=30).json()
+    except Exception as e:
+        print(f"FATAL: cannot reach Telegram API: {e}")
+        sys.exit(1)
+    if not me.get("ok"):
+        print(f"FATAL: TELEGRAM_BOT_TOKEN rejected by Telegram: {me}")
+        print("Fix: regenerate the token via @BotFather and update the GitHub Actions secret.")
+        sys.exit(1)
+    bot_username = me["result"].get("username")
+    print(f"Bot OK: @{bot_username}")
+
+    chat = requests.get(
+        f"https://api.telegram.org/bot{BOT_TOKEN}/getChat",
+        params={"chat_id": CHAT_ID},
+        timeout=30,
+    ).json()
+    if not chat.get("ok"):
+        print(f"FATAL: PORTFOLIO_CHAT_ID={CHAT_ID!r} not reachable by @{bot_username}.")
+        print(_explain_tg_error(chat))
+        sys.exit(1)
+    title = chat["result"].get("title") or chat["result"].get("username") or CHAT_ID
+    print(f"Chat OK: {title} (id={CHAT_ID})")
+
+
 def main():
     sgt = pytz.timezone("Asia/Singapore")
     now = datetime.datetime.now(sgt)
     date_str = now.strftime("%Y-%m-%d")
     session_label = "AM" if now.hour < 12 else "PM"
+
+    preflight()
 
     portfolio = load_portfolio()
     tickers = [p["ticker"] for p in portfolio["positions"]]
@@ -228,12 +277,14 @@ def main():
         print("Posted successfully.")
         return
     print(f"First attempt failed: {result}")
+    print(_explain_tg_error(result))
     time.sleep(5)
     result2 = post(msg)
     if result2 and result2.get("ok"):
         print("Posted on retry.")
     else:
         print(f"Retry failed: {result2}")
+        print(_explain_tg_error(result2))
         sys.exit(1)
 
 
