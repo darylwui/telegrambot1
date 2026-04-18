@@ -18,7 +18,7 @@ import pytz
 import requests
 import yfinance as yf
 
-BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
+BOT_TOKEN = os.environ["PORTFOLIO_BOT_TOKEN"]
 CHAT_ID   = os.environ["PORTFOLIO_CHAT_ID"]
 
 PORTFOLIO_FILE = "portfolio.json"
