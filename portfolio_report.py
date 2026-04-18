@@ -1,37 +1,33 @@
 #!/usr/bin/env python3
 """
-Portfolio report: reads portfolio.json, fetches live prices, computes P&L,
-generates fresh bull/bear/analyst theses via Claude, and posts a
-formatted summary to the Portfolio Telegram chat.
+Portfolio report: reads portfolio.json, fetches live prices + analyst data
++ recent news from Yahoo Finance, computes P&L, and posts a formatted
+summary to the Portfolio Telegram chat. No hand-maintained files.
 
 Runs twice daily via GitHub Actions:
-  - Tue–Sat 08:00 SGT (00:00 UTC)
-  - Mon–Fri 20:00 SGT (12:00 UTC)
+  - Tue-Sat 08:00 SGT (00:00 UTC)
+  - Mon-Fri 20:00 SGT (12:00 UTC)
 """
+import datetime
 import json
 import os
 import sys
 import time
-import datetime
+
 import pytz
-import yfinance as yf
 import requests
-import anthropic
+import yfinance as yf
 
-# ── Config ──────────────────────────────────────────────────────────────────
-
-BOT_TOKEN     = os.environ["TELEGRAM_BOT_TOKEN"]
-CHAT_ID       = os.environ["PORTFOLIO_CHAT_ID"]
-ANTHROPIC_KEY = os.environ["ANTHROPIC_API_KEY"]
+BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
+CHAT_ID   = os.environ["PORTFOLIO_CHAT_ID"]
 
 PORTFOLIO_FILE = "portfolio.json"
-CLAUDE_MODEL   = "claude-opus-4-7"
 
-# ── Portfolio + prices ───────────────────────────────────────────────────────────
 
 def load_portfolio():
     with open(PORTFOLIO_FILE) as f:
         return json.load(f)
+
 
 def get_prices(tickers):
     data = yf.download(tickers, period="2d", auto_adjust=True, progress=False)
@@ -46,41 +42,78 @@ def get_prices(tickers):
             prices[t] = None
     return prices
 
-# ── Claude-generated theses ─────────────────────────────────────────────────────
 
-def generate_theses(tickers):
-    """Ask Claude for fresh per-ticker theses. Returns {ticker: {analyst, bull, bear}}."""
-    client = anthropic.Anthropic(api_key=ANTHROPIC_KEY)
-    tickers_str = ", ".join(tickers)
-    prompt = (
-        f"For each of these tickers: {tickers_str}\n\n"
-        "Provide three concise items per ticker, grounded in the most recent "
-        "views of top Wall Street analysts (Morgan Stanley, Goldman Sachs, JPM, "
-        "Barclays, Bernstein, Evercore, etc.):\n"
-        "  1. analyst — consensus analyst view (1–2 sentences, include recent "
-        "     rating/price-target signal if notable)\n"
-        "  2. bull — strongest bull case for next 1–2 quarters (1–2 sentences)\n"
-        "  3. bear — strongest bear case / key risk for next 1–2 quarters (1–2 sentences)\n\n"
-        "Return ONLY valid JSON, no prose, in this exact shape:\n"
-        '{"TICKER": {"analyst": "...", "bull": "...", "bear": "..."}, ...}\n'
-        "Keep each field under 280 characters. No markdown, no backticks."
-    )
-    msg = client.messages.create(
-        model=CLAUDE_MODEL,
-        max_tokens=4000,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    text = msg.content[0].text.strip()
-    if text.startswith("```"):
-        text = text.split("```")[1]
-        if text.startswith("json"):
-            text = text[4:]
-        text = text.strip()
-    return json.loads(text)
+def _pick_news_fields(item):
+    """yfinance returns two shapes depending on version. Normalize them."""
+    title = item.get("title")
+    publisher = item.get("publisher")
+    if not title and isinstance(item.get("content"), dict):
+        c = item["content"]
+        title = c.get("title")
+        provider = c.get("provider") or {}
+        publisher = provider.get("displayName")
+    return title, publisher
 
-# ── Message builder ────────────────────────────────────────────────────────────────
 
-def build_message(portfolio, prices, theses, date_str, session_label):
+def fetch_snapshot(ticker, current_px):
+    """Pull live analyst + earnings + news signals for one ticker."""
+    out = {"analyst": None, "earnings": None, "news": []}
+    t = yf.Ticker(ticker)
+
+    info = {}
+    try:
+        info = t.info or {}
+    except Exception:
+        info = {}
+
+    rating = info.get("recommendationKey") or ""
+    count = info.get("numberOfAnalystOpinions")
+    target_mean = info.get("targetMeanPrice")
+    target_high = info.get("targetHighPrice")
+    target_low  = info.get("targetLowPrice")
+
+    parts = []
+    if rating:
+        parts.append(str(rating).replace("_", " ").title())
+    if count:
+        parts.append(f"{count} analysts")
+    if target_mean and current_px:
+        upside = (target_mean - current_px) / current_px * 100
+        sign = "+" if upside >= 0 else ""
+        parts.append(f"PT ${target_mean:.0f} ({sign}{upside:.0f}%)")
+    elif target_mean:
+        parts.append(f"PT ${target_mean:.0f}")
+    if target_low and target_high and target_mean:
+        parts.append(f"range ${target_low:.0f}-${target_high:.0f}")
+    if parts:
+        out["analyst"] = " | ".join(parts)
+
+    earnings_ts = info.get("earningsTimestamp") or info.get("earningsTimestampStart")
+    if earnings_ts:
+        try:
+            ed = datetime.datetime.fromtimestamp(int(earnings_ts), tz=datetime.timezone.utc).date()
+            days = (ed - datetime.date.today()).days
+            if -2 <= days <= 60:
+                out["earnings"] = f"Earnings {ed.strftime('%b %d')} ({days:+d}d)"
+        except Exception:
+            pass
+
+    try:
+        raw_news = t.news or []
+    except Exception:
+        raw_news = []
+    for item in raw_news:
+        title, publisher = _pick_news_fields(item)
+        if not title:
+            continue
+        out["news"].append(f"{title} ({publisher})" if publisher else title)
+        if len(out["news"]) >= 2:
+            break
+
+    return out
+
+
+def build_message(portfolio, prices, snapshots, date_str, session_label):
     positions = portfolio["positions"]
     lines = [f"<b>\U0001f4bc Portfolio Watch \u2014 {date_str} {session_label}</b>"]
 
@@ -124,25 +157,25 @@ def build_message(portfolio, prices, theses, date_str, session_label):
         )
 
     lines.append("")
-    lines.append("<b>Analyst / Bull / Bear \u2014 per ticker</b>")
+    lines.append("<b>Analyst view &amp; recent news \u2014 per ticker</b>")
     for p in positions:
         t = p["ticker"]
-        th = theses.get(t, {})
+        snap = snapshots.get(t) or {}
+        if not (snap.get("analyst") or snap.get("earnings") or snap.get("news")):
+            continue
         lines.append("")
         lines.append(f"<b>{t}</b>")
-        if th.get("analyst"):
-            lines.append(f"\U0001f9e0 {th['analyst']}")
-        if th.get("bull"):
-            lines.append(f"\U0001f402 {th['bull']}")
-        if th.get("bear"):
-            lines.append(f"\U0001f43b {th['bear']}")
+        if snap.get("analyst"):
+            lines.append(f"\U0001f9e0 {snap['analyst']}")
+        if snap.get("earnings"):
+            lines.append(f"\U0001f4c5 {snap['earnings']}")
+        for headline in snap.get("news", []):
+            lines.append(f"\U0001f4f0 {headline}")
 
     return "\n".join(lines)
 
-# ── Telegram post ────────────────────────────────────────────────────────────────────
 
 def post(text):
-    # Telegram limit is 4096 chars; split by double-newline blocks if needed.
     MAX = 4000
     if len(text) <= MAX:
         chunks = [text]
@@ -169,7 +202,6 @@ def post(text):
             return last
     return last
 
-# ── Main ───────────────────────────────────────────────────────────────────────────────
 
 def main():
     sgt = pytz.timezone("Asia/Singapore")
@@ -181,13 +213,15 @@ def main():
     tickers = [p["ticker"] for p in portfolio["positions"]]
 
     prices = get_prices(tickers)
-    try:
-        theses = generate_theses(tickers)
-    except Exception as e:
-        print(f"Thesis generation failed: {e}")
-        theses = {}
+    snapshots = {}
+    for t in tickers:
+        try:
+            snapshots[t] = fetch_snapshot(t, prices.get(t))
+        except Exception as e:
+            print(f"snapshot failed for {t}: {e}")
+            snapshots[t] = {"analyst": None, "earnings": None, "news": []}
 
-    msg = build_message(portfolio, prices, theses, date_str, session_label)
+    msg = build_message(portfolio, prices, snapshots, date_str, session_label)
 
     result = post(msg)
     if result and result.get("ok"):
