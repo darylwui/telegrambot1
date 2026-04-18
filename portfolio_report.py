@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """
-Portfolio report: reads portfolio.json, fetches live prices, computes P&L,
-generates fresh bull/bear/analyst theses via Claude, and posts a
-formatted summary to the Portfolio Telegram chat.
+Portfolio report: reads portfolio.json + theses.json, fetches live prices,
+computes P&L, and posts a formatted summary to the Portfolio Telegram chat.
+
+Edit theses.json quarterly to refresh analyst/bull/bear per ticker.
 
 Runs twice daily via GitHub Actions:
-  - Tue–Sat 08:00 SGT (00:00 UTC)
-  - Mon–Fri 20:00 SGT (12:00 UTC)
+  - Tue-Sat 08:00 SGT (00:00 UTC)
+  - Mon-Fri 20:00 SGT (12:00 UTC)
 """
 import json
 import os
@@ -16,21 +17,16 @@ import datetime
 import pytz
 import yfinance as yf
 import requests
-import anthropic
 
-# ── Config ────────────────────────────────────────────────────────────────────
-
-BOT_TOKEN     = os.environ["TELEGRAM_BOT_TOKEN"]
-CHAT_ID       = os.environ["PORTFOLIO_CHAT_ID"]
-ANTHROPIC_KEY = os.environ["ANTHROPIC_API_KEY"]
+BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
+CHAT_ID   = os.environ["PORTFOLIO_CHAT_ID"]
 
 PORTFOLIO_FILE = "portfolio.json"
-CLAUDE_MODEL   = "claude-opus-4-7"
+THESES_FILE    = "theses.json"
 
-# ── Portfolio + prices ────────────────────────────────────────────────────────
 
-def load_portfolio():
-    with open(PORTFOLIO_FILE) as f:
+def load_json(path):
+    with open(path) as f:
         return json.load(f)
 
 def get_prices(tickers):
@@ -46,41 +42,8 @@ def get_prices(tickers):
             prices[t] = None
     return prices
 
-# ── Claude-generated theses ───────────────────────────────────────────────────
 
-def generate_theses(tickers):
-    """Ask Claude for fresh per-ticker theses. Returns {ticker: {analyst, bull, bear}}."""
-    client = anthropic.Anthropic(api_key=ANTHROPIC_KEY)
-    tickers_str = ", ".join(tickers)
-    prompt = (
-        f"For each of these tickers: {tickers_str}\n\n"
-        "Provide three concise items per ticker, grounded in the most recent "
-        "views of top Wall Street analysts (Morgan Stanley, Goldman Sachs, JPM, "
-        "Barclays, Bernstein, Evercore, etc.):\n"
-        "  1. analyst — consensus analyst view (1–2 sentences, include recent "
-        "     rating/price-target signal if notable)\n"
-        "  2. bull — strongest bull case for next 1–2 quarters (1–2 sentences)\n"
-        "  3. bear — strongest bear case / key risk for next 1–2 quarters (1–2 sentences)\n\n"
-        "Return ONLY valid JSON, no prose, in this exact shape:\n"
-        '{"TICKER": {"analyst": "...", "bull": "...", "bear": "..."}, ...}\n'
-        "Keep each field under 280 characters. No markdown, no backticks."
-    )
-    msg = client.messages.create(
-        model=CLAUDE_MODEL,
-        max_tokens=4000,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    text = msg.content[0].text.strip()
-    if text.startswith("```"):
-        text = text.split("```")[1]
-        if text.startswith("json"):
-            text = text[4:]
-        text = text.strip()
-    return json.loads(text)
-
-# ── Message builder ───────────────────────────────────────────────────────────
-
-def build_message(portfolio, prices, theses, date_str, session_label):
+def build_message(portfolio, theses, prices, date_str, session_label):
     positions = portfolio["positions"]
     lines = [f"<b>\U0001f4bc Portfolio Watch \u2014 {date_str} {session_label}</b>"]
 
@@ -127,7 +90,9 @@ def build_message(portfolio, prices, theses, date_str, session_label):
     lines.append("<b>Analyst / Bull / Bear \u2014 per ticker</b>")
     for p in positions:
         t = p["ticker"]
-        th = theses.get(t, {})
+        th = theses.get(t)
+        if not th:
+            continue
         lines.append("")
         lines.append(f"<b>{t}</b>")
         if th.get("analyst"):
@@ -139,10 +104,8 @@ def build_message(portfolio, prices, theses, date_str, session_label):
 
     return "\n".join(lines)
 
-# ── Telegram post ─────────────────────────────────────────────────────────────
 
 def post(text):
-    # Telegram limit is 4096 chars; split by double-newline blocks if needed.
     MAX = 4000
     if len(text) <= MAX:
         chunks = [text]
@@ -169,7 +132,6 @@ def post(text):
             return last
     return last
 
-# ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
     sgt = pytz.timezone("Asia/Singapore")
@@ -177,17 +139,15 @@ def main():
     date_str = now.strftime("%Y-%m-%d")
     session_label = "AM" if now.hour < 12 else "PM"
 
-    portfolio = load_portfolio()
-    tickers = [p["ticker"] for p in portfolio["positions"]]
-
-    prices = get_prices(tickers)
+    portfolio = load_json(PORTFOLIO_FILE)
     try:
-        theses = generate_theses(tickers)
-    except Exception as e:
-        print(f"Thesis generation failed: {e}")
+        theses = load_json(THESES_FILE)
+    except FileNotFoundError:
         theses = {}
 
-    msg = build_message(portfolio, prices, theses, date_str, session_label)
+    tickers = [p["ticker"] for p in portfolio["positions"]]
+    prices = get_prices(tickers)
+    msg = build_message(portfolio, theses, prices, date_str, session_label)
 
     result = post(msg)
     if result and result.get("ok"):

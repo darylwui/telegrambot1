@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 """
-Telegram bot for portfolio uploads.
+Telegram bot for portfolio uploads (CSV-only, zero third-party AI cost).
 
-- Receives a photo (portfolio screenshot) or a CSV document.
-- Photos: parsed with Claude Vision into structured positions.
-- CSVs: parsed directly (expects columns: ticker, shares, cost).
+- Receives a CSV document with columns: ticker, shares, cost.
 - Commits the resulting portfolio.json to the GitHub repo on the default branch.
 - Replies in-chat with a confirmation summary.
 
@@ -21,17 +19,12 @@ import sys
 import time
 
 import requests
-import anthropic
-
-# ── Config ────────────────────────────────────────────────────────────────────
 
 BOT_TOKEN      = os.environ["TELEGRAM_BOT_TOKEN"]
-ANTHROPIC_KEY  = os.environ["ANTHROPIC_API_KEY"]
 GITHUB_TOKEN   = os.environ["GITHUB_TOKEN"]
-GITHUB_REPO    = os.environ["GITHUB_REPO"]               # e.g. darylwui/telegrambot1
+GITHUB_REPO    = os.environ["GITHUB_REPO"]
 GITHUB_BRANCH  = os.environ.get("GITHUB_BRANCH", "master")
 PORTFOLIO_PATH = os.environ.get("PORTFOLIO_PATH", "portfolio.json")
-CLAUDE_MODEL   = os.environ.get("CLAUDE_MODEL", "claude-opus-4-7")
 
 TG_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 GH_API = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{PORTFOLIO_PATH}"
@@ -39,7 +32,14 @@ GH_API = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{PORTFOLIO_PATH}"
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("portfolio-bot")
 
-# ── Telegram helpers ──────────────────────────────────────────────────────────
+CSV_HELP = (
+    "Send a CSV file with columns <code>ticker,shares,cost</code>.\n\n"
+    "Example:\n"
+    "<code>ticker,shares,cost\n"
+    "AMZN,50,183.38\n"
+    "NVDA,400,187.36</code>"
+)
+
 
 def tg_get(method, **params):
     r = requests.get(f"{TG_API}/{method}", params=params, timeout=60)
@@ -58,48 +58,10 @@ def tg_download_file(file_id):
     url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{path}"
     return requests.get(url, timeout=60).content
 
-# ── Parsers ───────────────────────────────────────────────────────────────────
-
-def parse_photo(image_bytes, mime="image/jpeg"):
-    client = anthropic.Anthropic(api_key=ANTHROPIC_KEY)
-    b64 = base64.standard_b64encode(image_bytes).decode("utf-8")
-    prompt = (
-        "Extract every portfolio position from this screenshot.\n"
-        "For each row, return ticker symbol, shares held, and average cost per share.\n"
-        "Return ONLY valid JSON matching this exact shape:\n"
-        '{"positions": [{"ticker": "AAPL", "shares": 10, "cost": 150.25}, ...]}\n'
-        "Rules:\n"
-        "- Use the ticker symbol only (e.g. AMZN, not Amazon).\n"
-        "- shares must be a number (integer or float).\n"
-        "- cost must be the average cost per share as a number.\n"
-        "- Ignore total rows, headers, cash rows.\n"
-        "- No markdown, no prose, no backticks."
-    )
-    msg = client.messages.create(
-        model=CLAUDE_MODEL,
-        max_tokens=4000,
-        messages=[{
-            "role": "user",
-            "content": [
-                {"type": "image", "source": {
-                    "type": "base64", "media_type": mime, "data": b64,
-                }},
-                {"type": "text", "text": prompt},
-            ],
-        }],
-    )
-    text = msg.content[0].text.strip()
-    if text.startswith("```"):
-        text = text.split("```")[1]
-        if text.startswith("json"):
-            text = text[4:]
-        text = text.strip()
-    return json.loads(text)
 
 def parse_csv(csv_bytes):
     text = csv_bytes.decode("utf-8-sig", errors="replace")
     reader = csv.DictReader(io.StringIO(text))
-    # Normalize header keys to lowercase
     positions = []
     for row in reader:
         norm = {k.strip().lower(): v for k, v in row.items() if k}
@@ -116,7 +78,6 @@ def parse_csv(csv_bytes):
         positions.append({"ticker": t, "shares": shares, "cost": cost})
     return {"positions": positions}
 
-# ── GitHub commit ─────────────────────────────────────────────────────────────
 
 def commit_portfolio(portfolio):
     portfolio["updated"] = datetime.datetime.utcnow().strftime("%Y-%m-%d")
@@ -127,7 +88,6 @@ def commit_portfolio(portfolio):
         "Authorization": f"token {GITHUB_TOKEN}",
         "Accept": "application/vnd.github+json",
     }
-    # Fetch current SHA
     r = requests.get(GH_API, headers=headers, params={"ref": GITHUB_BRANCH}, timeout=30)
     sha = r.json().get("sha") if r.status_code == 200 else None
 
@@ -143,7 +103,6 @@ def commit_portfolio(portfolio):
     r.raise_for_status()
     return r.json()
 
-# ── Message handler ───────────────────────────────────────────────────────────
 
 def summarize(portfolio):
     ps = portfolio["positions"]
@@ -151,10 +110,11 @@ def summarize(portfolio):
     for p in ps[:30]:
         sh = p["shares"]
         sh_s = f"{int(sh)}" if float(sh).is_integer() else f"{sh}"
-        lines.append(f"• <b>{p['ticker']}</b>  {sh_s}@${p['cost']:.2f}")
+        lines.append(f"\u2022 <b>{p['ticker']}</b>  {sh_s}@${p['cost']:.2f}")
     if len(ps) > 30:
-        lines.append(f"… and {len(ps) - 30} more")
+        lines.append(f"\u2026 and {len(ps) - 30} more")
     return "\n".join(lines)
+
 
 def handle_update(update):
     msg = update.get("message") or update.get("channel_post")
@@ -163,59 +123,40 @@ def handle_update(update):
     chat_id = msg["chat"]["id"]
 
     try:
-        portfolio = None
-
         if "photo" in msg:
-            # Highest-resolution variant is last
-            file_id = msg["photo"][-1]["file_id"]
-            img = tg_download_file(file_id)
-            tg_send(chat_id, "\u23f3 Parsing screenshot with Claude…")
-            portfolio = parse_photo(img, mime="image/jpeg")
+            tg_send(chat_id, "\u26a0\ufe0f Screenshots are disabled. " + CSV_HELP)
+            return
 
-        elif "document" in msg:
+        if "document" in msg:
             doc = msg["document"]
             name = (doc.get("file_name") or "").lower()
             mime = doc.get("mime_type") or ""
-            data = tg_download_file(doc["file_id"])
-            if name.endswith(".csv") or "csv" in mime:
-                tg_send(chat_id, "\u23f3 Parsing CSV…")
-                portfolio = parse_csv(data)
-            elif mime.startswith("image/"):
-                tg_send(chat_id, "\u23f3 Parsing image with Claude…")
-                portfolio = parse_photo(data, mime=mime)
-            else:
-                tg_send(chat_id, "Please send a portfolio screenshot (photo) or a CSV.")
+            if not (name.endswith(".csv") or "csv" in mime):
+                tg_send(chat_id, "\u26a0\ufe0f Only CSV files are supported. " + CSV_HELP)
                 return
+            tg_send(chat_id, "\u23f3 Parsing CSV\u2026")
+            data = tg_download_file(doc["file_id"])
+            portfolio = parse_csv(data)
+            if not portfolio.get("positions"):
+                tg_send(chat_id, "\u26a0\ufe0f Couldn't parse any positions. " + CSV_HELP)
+                return
+            commit_portfolio(portfolio)
+            tg_send(chat_id, summarize(portfolio))
+            return
 
-        elif "text" in msg:
+        if "text" in msg:
             text = msg["text"].strip().lower()
             if text in ("/start", "/help"):
-                tg_send(
-                    chat_id,
-                    "Send a portfolio screenshot or a CSV with columns "
-                    "<code>ticker,shares,cost</code>. I will update "
-                    "<code>portfolio.json</code> in the repo.",
-                )
+                tg_send(chat_id, CSV_HELP)
             return
-        else:
-            return
-
-        if not portfolio or not portfolio.get("positions"):
-            tg_send(chat_id, "\u26a0\ufe0f Couldn't extract any positions. Try a clearer image or a CSV.")
-            return
-
-        commit_portfolio(portfolio)
-        tg_send(chat_id, summarize(portfolio))
 
     except Exception as e:
         log.exception("handler error")
         tg_send(chat_id, f"\u274c Error: {e}")
 
-# ── Poll loop ─────────────────────────────────────────────────────────────────
 
 def main():
     log.info("Portfolio bot starting; repo=%s branch=%s", GITHUB_REPO, GITHUB_BRANCH)
-    # Clear any existing webhook + drop pending updates so only this instance polls.
     try:
         requests.post(
             f"{TG_API}/deleteWebhook",
