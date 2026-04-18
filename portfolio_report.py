@@ -145,7 +145,8 @@ def build_message(portfolio, prices, snapshots, date_str, session_label):
             if px >= pt:
                 lines.append(f"\u2705 PT ${pt:.0f} reached  |  now {sign}{dist:.0f}% above target")
             else:
-                lines.append(f"\u27a1\ufe0f PT ${pt:.0f}  |  {sign}{dist:.0f}% to target")
+                dollar_away = pt - px
+                lines.append(f"\u27a1\ufe0f PT ${pt:.0f}  |  ${dollar_away:.2f} away ({sign}{dist:.0f}%)")
         if snap.get("analyst"):
             lines.append(f"\U0001f9e0 {snap['analyst']}")
         if snap.get("earnings"):
