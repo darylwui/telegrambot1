@@ -1,0 +1,26 @@
+name: Portfolio Watch (Morning)
+
+on:
+  schedule:
+    - cron: '0 0 * * 2-6'   # 08:00 SGT (UTC+8), Tue–Sat
+  workflow_dispatch:
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install yfinance requests pytz anthropic
+
+      - name: Run portfolio report
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          PORTFOLIO_CHAT_ID: ${{ secrets.PORTFOLIO_CHAT_ID }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python portfolio_report.py
