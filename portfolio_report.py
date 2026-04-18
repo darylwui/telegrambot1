@@ -211,11 +211,13 @@ def post(text):
         if cur:
             chunks.append(cur)
 
+    total = len(chunks)
     last = None
-    for chunk in chunks:
+    for i, chunk in enumerate(chunks, 1):
+        text = f"<i>Page {i}/{total}</i>\n\n{chunk}" if total > 1 else chunk
         resp = requests.post(
             f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
-            data={"chat_id": CHAT_ID, "parse_mode": "HTML", "text": chunk},
+            data={"chat_id": CHAT_ID, "parse_mode": "HTML", "text": text},
             timeout=30,
         )
         last = resp.json()
