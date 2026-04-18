@@ -15,9 +15,7 @@ import pytz
 import yfinance as yf
 import requests
 
-from news_sources import fetch_all_feeds, filter_news
-
-# ── Config ────────────────────────────────────────────────────────────────────
+# ── Config ─────────────────────────────────────────────────────────────────────────────
 
 STRIKES = {
     "AMZN": 198.79,
@@ -32,7 +30,7 @@ THESES = {
         "bull": (
             "AWS growing 24% YoY on a $142B annualized run rate with a $244B backlog "
             "(up 40% YoY); Bedrock AI spend grew 60% QoQ. Q1 2026 earnings April 29, "
-            "operating income guided $16.5–$21.5B."
+            "operating income guided $16.5\u2013$21.5B."
         ),
         "bear": (
             "$200B capex plan pressures near-term FCF; tariffs on imported goods and "
@@ -48,18 +46,18 @@ THESES = {
         ),
         "bear": (
             "DOJ antitrust remedies could unwind lucrative default-search distribution "
-            "deals; $175–$185B 2026 capex more than doubles prior-year spend; "
+            "deals; $175\u2013$185B 2026 capex more than doubles prior-year spend; "
             "OpenAI and Perplexity intensifying competition in AI-driven search."
         ),
     },
     "META": {
         "bull": (
-            "Q1 2026 revenue guidance $53.5–$56.5B reflects AI-powered ad growth "
+            "Q1 2026 revenue guidance $53.5\u2013$56.5B reflects AI-powered ad growth "
             "accelerating to ~24% YoY; Advantage+ automation and Reels continue to "
             "lift advertiser ROI; PayPal partnership expands commerce footprint."
         ),
         "bear": (
-            "$115–$135B 2026 capex nearly doubles 2025 spend and will pressure FCF "
+            "$115\u2013$135B 2026 capex nearly doubles 2025 spend and will pressure FCF "
             "for multiple quarters; Reality Labs operating losses persist; "
             "macro headwinds from tariffs could soften H2 ad budgets."
         ),
@@ -81,7 +79,7 @@ THESES = {
 BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 CHAT_ID   = os.environ["TELEGRAM_CHAT_ID"]
 
-# ── Earnings + analyst fetch ──────────────────────────────────────────────────
+# ── Earnings + analyst fetch ────────────────────────────────────────────────
 
 def fetch_earnings_data(ticker):
     """Return earnings date, days away, EPS estimate, and analyst consensus."""
@@ -113,7 +111,7 @@ def fetch_earnings_data(ticker):
         pass
     return out
 
-# ── Price fetch ───────────────────────────────────────────────────────────────
+# ── Price fetch ─────────────────────────────────────────────────────────────────────────
 
 def get_prices():
     tickers = list(STRIKES.keys())
@@ -126,9 +124,9 @@ def get_prices():
             prices[t] = None
     return prices
 
-# ── Message builder ───────────────────────────────────────────────────────────
+# ── Message builder ───────────────────────────────────────────────────────────────────
 
-def build_message(prices, earnings_map, news_map, date_str):
+def build_message(prices, earnings_map, date_str):
     lines = [f"<b>\U0001f4ca Daily Stock Watch \u2014 {date_str}</b>"]
 
     # Upcoming earnings summary (sorted by proximity)
@@ -194,18 +192,10 @@ def build_message(prices, earnings_map, news_map, date_str):
             lines.append(f"\U0001f4c5 Earnings {e['date'].strftime('%b %d')} ({e['days']:+d}d){eps}")
         lines.append(f"\U0001f402 {THESES[ticker]['bull']}")
         lines.append(f"\U0001f43b {THESES[ticker]['bear']}")
-        for n in news_map.get(ticker, []):
-            title = html.escape(n["title"])
-            pub = f" ({html.escape(n['publisher'])})" if n.get("publisher") else ""
-            if n.get("url"):
-                url = html.escape(n["url"], quote=True)
-                lines.append(f"\U0001f4f0 <a href=\"{url}\">{title}</a>{pub}")
-            else:
-                lines.append(f"\U0001f4f0 {title}{pub}")
 
     return "\n".join(lines)
 
-# ── Telegram post ─────────────────────────────────────────────────────────────
+# ── Telegram post ───────────────────────────────────────────────────────────────────
 
 def post(text):
     resp = requests.post(
@@ -215,7 +205,7 @@ def post(text):
     )
     return resp.json()
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+# ── Main ─────────────────────────────────────────────────────────────────────────────
 
 def main():
     sgt = pytz.timezone("Asia/Singapore")
@@ -230,15 +220,7 @@ def main():
             print(f"earnings fetch failed for {ticker}: {e}")
             earnings_map[ticker] = {}
 
-    print("Fetching US news feeds...")
-    all_news = fetch_all_feeds()
-    print(f"  {len(all_news)} articles loaded.")
-    COMPANY_NAMES = {"AMZN": "Amazon", "GOOG": "Alphabet Google", "META": "Meta", "NVDA": "Nvidia"}
-    news_map = {}
-    for ticker in STRIKES:
-        news_map[ticker] = filter_news(all_news, ticker, COMPANY_NAMES.get(ticker, ""))
-
-    msg = build_message(prices, earnings_map, news_map, date_str)
+    msg = build_message(prices, earnings_map, date_str)
 
     result = post(msg)
     if result.get("ok"):

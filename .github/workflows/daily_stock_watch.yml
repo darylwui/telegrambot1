@@ -16,7 +16,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install dependencies
-        run: pip install yfinance requests pytz feedparser
+        run: pip install yfinance requests pytz
 
       - name: Run stock analysis
         env:
