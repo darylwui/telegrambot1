@@ -16,7 +16,12 @@ jobs:
           python-version: '3.12'
 
       - name: Install dependencies
-        run: pip install yfinance requests pytz
+        run: pip install yfinance requests pytz anthropic
+
+      - name: Update macro outlook
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python update_macro.py
 
       - name: Run stock analysis
         env:
