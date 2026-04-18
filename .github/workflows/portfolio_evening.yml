@@ -20,6 +20,6 @@ jobs:
 
       - name: Run portfolio report
         env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          PORTFOLIO_BOT_TOKEN: ${{ secrets.PORTFOLIO_BOT_TOKEN }}
           PORTFOLIO_CHAT_ID: ${{ secrets.PORTFOLIO_CHAT_ID }}
         run: python portfolio_report.py
