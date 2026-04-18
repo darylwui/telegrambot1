@@ -3,7 +3,7 @@
 Daily stock watch: fetches live prices, computes deltas vs strikes,
 and posts a formatted bear/bull summary to Telegram.
 
-Update THESES quarterly as earnings dates, capex guidance, and
+Update THESES and MACRO quarterly as earnings dates, capex guidance, and
 macro catalysts evolve.
 """
 import html
@@ -76,6 +76,21 @@ THESES = {
     },
 }
 
+MACRO = {
+    "risks": [
+        "Fed holds rates at 4.25\u20134.50%; market pricing ~3 cuts by end-2026 \u2014 any hawkish pivot reprices growth stocks sharply.",
+        "US\u2013China tariffs (145% on Chinese goods, 125% retaliatory) threaten hardware supply chains and inflate cost bases.",
+        "Recession probability elevated (~45% per major banks) as ISM manufacturing contracts and consumer confidence weakens.",
+        "Dollar weakening (DXY -8% YTD) supports multinational USD revenue but signals broader macro stress.",
+    ],
+    "watch": [
+        "Apr 29: AMZN + GOOG Q1 earnings \u2014 bellwether for cloud/AI spend and ad market health.",
+        "Apr 30: Q1 US GDP first estimate \u2014 contraction would trigger broad risk-off.",
+        "May FOMC: Fed rate decision \u2014 guidance on inflation vs. growth trade-off.",
+        "US\u2013China trade talks: Any tariff de-escalation is a major upside catalyst for NVDA and AMZN.",
+    ],
+}
+
 BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 CHAT_ID   = os.environ["TELEGRAM_CHAT_ID"]
 
@@ -128,6 +143,15 @@ def get_prices():
 
 def build_message(prices, earnings_map, date_str):
     lines = [f"<b>\U0001f4ca Daily Stock Watch \u2014 {date_str}</b>"]
+
+    lines.append("")
+    lines.append("<b>\U0001f310 Macro Outlook</b>")
+    lines.append("<b>Key risks</b>")
+    for r in MACRO["risks"]:
+        lines.append(f"  \u26a0\ufe0f {r}")
+    lines.append("<b>Watch</b>")
+    for w in MACRO["watch"]:
+        lines.append(f"  \U0001f4cc {w}")
 
     # Upcoming earnings summary (sorted by proximity)
     upcoming = sorted(
