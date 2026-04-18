@@ -78,6 +78,7 @@ def fetch_snapshot(ticker, current_px, all_news):
         parts.append(f"range ${target_low:.0f}-${target_high:.0f}")
     if parts:
         out["analyst"] = " | ".join(parts)
+    out["target_mean"] = target_mean
 
     earnings_ts = info.get("earningsTimestamp") or info.get("earningsTimestampStart")
     if earnings_ts:
@@ -137,6 +138,14 @@ def build_message(portfolio, prices, snapshots, date_str, session_label):
                 f"P&amp;L {sign}${pnl:,.0f} ({sign}{pct:.2f}%)"
             )
         snap = snapshots.get(t) or {}
+        pt = snap.get("target_mean")
+        if pt and px:
+            dist = (pt - px) / px * 100
+            sign = "+" if dist >= 0 else ""
+            if px >= pt:
+                lines.append(f"\u2705 PT ${pt:.0f} reached  |  now {sign}{dist:.0f}% above target")
+            else:
+                lines.append(f"\u27a1\ufe0f PT ${pt:.0f}  |  {sign}{dist:.0f}% to target")
         if snap.get("analyst"):
             lines.append(f"\U0001f9e0 {snap['analyst']}")
         if snap.get("earnings"):
