@@ -19,8 +19,6 @@ import pytz
 import requests
 import yfinance as yf
 
-from news_sources import fetch_all_feeds, filter_news
-
 BOT_TOKEN = os.environ["PORTFOLIO_BOT_TOKEN"]
 CHAT_ID   = os.environ["PORTFOLIO_CHAT_ID"]
 
@@ -46,9 +44,25 @@ def get_prices(tickers):
     return prices
 
 
-def fetch_snapshot(ticker, current_px, all_news):
-    """Pull live analyst + earnings signals and filtered US news for one ticker."""
-    out = {"analyst": None, "earnings": None, "news": []}
+def _pick_news_fields(item):
+    """yfinance returns two shapes depending on version. Normalize them."""
+    title = item.get("title")
+    publisher = item.get("publisher")
+    url = item.get("link")
+    if not title and isinstance(item.get("content"), dict):
+        c = item["content"]
+        title = c.get("title")
+        provider = c.get("provider") or {}
+        publisher = provider.get("displayName")
+        click = c.get("clickThroughUrl") or {}
+        canonical = c.get("canonicalUrl") or {}
+        url = click.get("url") or canonical.get("url") or url
+    return title, publisher, url
+
+
+def fetch_snapshot(ticker, current_px):
+    """Pull live analyst + earnings + news signals for one ticker."""
+    out = {"analyst": None, "earnings": None, "news": [], "target_mean": None}
     t = yf.Ticker(ticker)
 
     info = {}
@@ -90,8 +104,17 @@ def fetch_snapshot(ticker, current_px, all_news):
         except Exception:
             pass
 
-    company_name = info.get("shortName") or info.get("longName") or ""
-    out["news"] = filter_news(all_news, ticker, company_name)
+    try:
+        raw_news = t.news or []
+    except Exception:
+        raw_news = []
+    for item in raw_news:
+        title, publisher, url = _pick_news_fields(item)
+        if not title:
+            continue
+        out["news"].append({"title": title, "publisher": publisher, "url": url})
+        if len(out["news"]) >= 2:
+            break
 
     return out
 
@@ -177,7 +200,7 @@ def _explain_tg_error(result):
             f"correct chat.id (groups are negative, supergroups start with -100)."
         )
     if "unauthorized" in desc or code == 401:
-        return "TELEGRAM_BOT_TOKEN is invalid or revoked. Regenerate via @BotFather."
+        return "PORTFOLIO_BOT_TOKEN is invalid or revoked. Regenerate via @BotFather."
     if "bot was kicked" in desc or "bot is not a member" in desc:
         return "Bot was removed from the chat. Re-add it and try again."
     return f"Telegram returned: {result}"
@@ -221,7 +244,7 @@ def preflight():
         print(f"FATAL: cannot reach Telegram API: {e}")
         sys.exit(1)
     if not me.get("ok"):
-        print(f"FATAL: TELEGRAM_BOT_TOKEN rejected by Telegram: {me}")
+        print(f"FATAL: PORTFOLIO_BOT_TOKEN rejected by Telegram: {me}")
         print("Fix: regenerate the token via @BotFather and update the GitHub Actions secret.")
         sys.exit(1)
     bot_username = me["result"].get("username")
@@ -252,16 +275,13 @@ def main():
     tickers = [p["ticker"] for p in portfolio["positions"]]
 
     prices = get_prices(tickers)
-    print("Fetching US news feeds...")
-    all_news = fetch_all_feeds()
-    print(f"  {len(all_news)} articles loaded across all feeds.")
     snapshots = {}
     for t in tickers:
         try:
-            snapshots[t] = fetch_snapshot(t, prices.get(t), all_news)
+            snapshots[t] = fetch_snapshot(t, prices.get(t))
         except Exception as e:
             print(f"snapshot failed for {t}: {e}")
-            snapshots[t] = {"analyst": None, "earnings": None, "news": []}
+            snapshots[t] = {"analyst": None, "earnings": None, "news": [], "target_mean": None}
 
     msg = build_message(portfolio, prices, snapshots, date_str, session_label)
 
