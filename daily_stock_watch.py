@@ -6,6 +6,7 @@ and posts a formatted bear/bull summary to Telegram.
 Update THESES quarterly as earnings dates, capex guidance, and
 macro catalysts evolve.
 """
+import html
 import os
 import sys
 import time
@@ -13,6 +14,8 @@ import datetime
 import pytz
 import yfinance as yf
 import requests
+
+from news_sources import fetch_all_feeds, filter_news
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
@@ -125,7 +128,7 @@ def get_prices():
 
 # ── Message builder ───────────────────────────────────────────────────────────
 
-def build_message(prices, earnings_map, date_str):
+def build_message(prices, earnings_map, news_map, date_str):
     lines = [f"<b>\U0001f4ca Daily Stock Watch \u2014 {date_str}</b>"]
 
     # Upcoming earnings summary (sorted by proximity)
@@ -191,6 +194,14 @@ def build_message(prices, earnings_map, date_str):
             lines.append(f"\U0001f4c5 Earnings {e['date'].strftime('%b %d')} ({e['days']:+d}d){eps}")
         lines.append(f"\U0001f402 {THESES[ticker]['bull']}")
         lines.append(f"\U0001f43b {THESES[ticker]['bear']}")
+        for n in news_map.get(ticker, []):
+            title = html.escape(n["title"])
+            pub = f" ({html.escape(n['publisher'])})" if n.get("publisher") else ""
+            if n.get("url"):
+                url = html.escape(n["url"], quote=True)
+                lines.append(f"\U0001f4f0 <a href=\"{url}\">{title}</a>{pub}")
+            else:
+                lines.append(f"\U0001f4f0 {title}{pub}")
 
     return "\n".join(lines)
 
@@ -218,7 +229,16 @@ def main():
         except Exception as e:
             print(f"earnings fetch failed for {ticker}: {e}")
             earnings_map[ticker] = {}
-    msg = build_message(prices, earnings_map, date_str)
+
+    print("Fetching US news feeds...")
+    all_news = fetch_all_feeds()
+    print(f"  {len(all_news)} articles loaded.")
+    COMPANY_NAMES = {"AMZN": "Amazon", "GOOG": "Alphabet Google", "META": "Meta", "NVDA": "Nvidia"}
+    news_map = {}
+    for ticker in STRIKES:
+        news_map[ticker] = filter_news(all_news, ticker, COMPANY_NAMES.get(ticker, ""))
+
+    msg = build_message(prices, earnings_map, news_map, date_str)
 
     result = post(msg)
     if result.get("ok"):
