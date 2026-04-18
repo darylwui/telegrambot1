@@ -149,27 +149,17 @@ def build_message(portfolio, prices, snapshots, date_str, session_label):
         f"P&amp;L {sign_tot}${total_pnl:,.0f} ({sign_tot}{total_pct:.2f}%)"
     )
 
-    lines.append("")
-    lines.append("<b>Positions</b>")
     for t, sh, c, px, pnl, pct in rows:
+        lines.append("")
         if px is None:
             lines.append(f"<b>{t}</b>  {sh}@${c:.2f}  |  Last: unavailable")
-            continue
-        sign = "+" if pnl >= 0 else ""
-        lines.append(
-            f"<b>{t}</b>  {sh}@${c:.2f}  |  Px ${px:.2f}  |  "
-            f"P&amp;L {sign}${pnl:,.0f} ({sign}{pct:.2f}%)"
-        )
-
-    lines.append("")
-    lines.append("<b>Analyst view &amp; recent news \u2014 per ticker</b>")
-    for p in positions:
-        t = p["ticker"]
+        else:
+            sign = "+" if pnl >= 0 else ""
+            lines.append(
+                f"<b>{t}</b>  {sh}@${c:.2f}  |  Px ${px:.2f}  |  "
+                f"P&amp;L {sign}${pnl:,.0f} ({sign}{pct:.2f}%)"
+            )
         snap = snapshots.get(t) or {}
-        if not (snap.get("analyst") or snap.get("earnings") or snap.get("news")):
-            continue
-        lines.append("")
-        lines.append(f"<b>{t}</b>")
         if snap.get("analyst"):
             lines.append(f"\U0001f9e0 {snap['analyst']}")
         if snap.get("earnings"):
