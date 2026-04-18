@@ -18,7 +18,7 @@ import pytz
 import requests
 import yfinance as yf
 
-BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
+BOT_TOKEN = os.environ["PORTFOLIO_BOT_TOKEN"]
 CHAT_ID   = os.environ["PORTFOLIO_CHAT_ID"]
 
 PORTFOLIO_FILE = "portfolio.json"
@@ -189,7 +189,7 @@ def _explain_tg_error(result):
             f"correct chat.id (groups are negative, supergroups start with -100)."
         )
     if "unauthorized" in desc or code == 401:
-        return "TELEGRAM_BOT_TOKEN is invalid or revoked. Regenerate via @BotFather."
+        return "PORTFOLIO_BOT_TOKEN is invalid or revoked. Regenerate via @BotFather."
     if "bot was kicked" in desc or "bot is not a member" in desc:
         return "Bot was removed from the chat. Re-add it and try again."
     return f"Telegram returned: {result}"
@@ -231,7 +231,7 @@ def preflight():
         print(f"FATAL: cannot reach Telegram API: {e}")
         sys.exit(1)
     if not me.get("ok"):
-        print(f"FATAL: TELEGRAM_BOT_TOKEN rejected by Telegram: {me}")
+        print(f"FATAL: PORTFOLIO_BOT_TOKEN rejected by Telegram: {me}")
         print("Fix: regenerate the token via @BotFather and update the GitHub Actions secret.")
         sys.exit(1)
     bot_username = me["result"].get("username")
