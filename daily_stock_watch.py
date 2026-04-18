@@ -3,7 +3,7 @@
 Daily stock watch: fetches live prices, computes deltas vs strikes,
 and posts a formatted bear/bull summary to Telegram.
 
-Update THESES and MACRO quarterly as earnings dates, capex guidance, and
+Update THESES quarterly as earnings dates, capex guidance, and
 macro catalysts evolve.
 """
 import html
@@ -15,7 +15,7 @@ import pytz
 import yfinance as yf
 import requests
 
-# ── Config ─────────────────────────────────────────────────────────────────────────────
+# ── Config ──────────────────────────────────────────────────────────────────
 
 STRIKES = {
     "AMZN": 198.79,
@@ -30,7 +30,7 @@ THESES = {
         "bull": (
             "AWS growing 24% YoY on a $142B annualized run rate with a $244B backlog "
             "(up 40% YoY); Bedrock AI spend grew 60% QoQ. Q1 2026 earnings April 29, "
-            "operating income guided $16.5\u2013$21.5B."
+            "operating income guided $16.5–21.5B."
         ),
         "bear": (
             "$200B capex plan pressures near-term FCF; tariffs on imported goods and "
@@ -46,18 +46,18 @@ THESES = {
         ),
         "bear": (
             "DOJ antitrust remedies could unwind lucrative default-search distribution "
-            "deals; $175\u2013$185B 2026 capex more than doubles prior-year spend; "
+            "deals; $175–$185B 2026 capex more than doubles prior-year spend; "
             "OpenAI and Perplexity intensifying competition in AI-driven search."
         ),
     },
     "META": {
         "bull": (
-            "Q1 2026 revenue guidance $53.5\u2013$56.5B reflects AI-powered ad growth "
+            "Q1 2026 revenue guidance $53.5–$56.5B reflects AI-powered ad growth "
             "accelerating to ~24% YoY; Advantage+ automation and Reels continue to "
             "lift advertiser ROI; PayPal partnership expands commerce footprint."
         ),
         "bear": (
-            "$115\u2013$135B 2026 capex nearly doubles 2025 spend and will pressure FCF "
+            "$115–$135B 2026 capex nearly doubles 2025 spend and will pressure FCF "
             "for multiple quarters; Reality Labs operating losses persist; "
             "macro headwinds from tariffs could soften H2 ad budgets."
         ),
@@ -76,25 +76,12 @@ THESES = {
     },
 }
 
-MACRO = {
-    "risks": [
-        "Fed holds rates at 4.25\u20134.50%; market pricing ~3 cuts by end-2026 \u2014 any hawkish pivot reprices growth stocks sharply.",
-        "US\u2013China tariffs (145% on Chinese goods, 125% retaliatory) threaten hardware supply chains and inflate cost bases.",
-        "Recession probability elevated (~45% per major banks) as ISM manufacturing contracts and consumer confidence weakens.",
-        "Dollar weakening (DXY -8% YTD) supports multinational USD revenue but signals broader macro stress.",
-    ],
-    "watch": [
-        "Apr 29: AMZN + GOOG Q1 earnings \u2014 bellwether for cloud/AI spend and ad market health.",
-        "Apr 30: Q1 US GDP first estimate \u2014 contraction would trigger broad risk-off.",
-        "May FOMC: Fed rate decision \u2014 guidance on inflation vs. growth trade-off.",
-        "US\u2013China trade talks: Any tariff de-escalation is a major upside catalyst for NVDA and AMZN.",
-    ],
-}
+from macro_config import MACRO
 
 BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 CHAT_ID   = os.environ["TELEGRAM_CHAT_ID"]
 
-# ── Earnings + analyst fetch ────────────────────────────────────────────────
+# ── Earnings + analyst fetch ───────────────────────────────────────────────────
 
 def fetch_earnings_data(ticker):
     """Return earnings date, days away, EPS estimate, and analyst consensus."""
@@ -126,7 +113,7 @@ def fetch_earnings_data(ticker):
         pass
     return out
 
-# ── Price fetch ─────────────────────────────────────────────────────────────────────────
+# ── Price fetch ───────────────────────────────────────────────────────────────────────
 
 def get_prices():
     tickers = list(STRIKES.keys())
@@ -139,7 +126,7 @@ def get_prices():
             prices[t] = None
     return prices
 
-# ── Message builder ───────────────────────────────────────────────────────────────────
+# ── Message builder ──────────────────────────────────────────────────────────────────
 
 def build_message(prices, earnings_map, date_str):
     lines = [f"<b>\U0001f4ca Daily Stock Watch \u2014 {date_str}</b>"]
@@ -219,7 +206,7 @@ def build_message(prices, earnings_map, date_str):
 
     return "\n".join(lines)
 
-# ── Telegram post ───────────────────────────────────────────────────────────────────
+# ── Telegram post ────────────────────────────────────────────────────────────────────
 
 def post(text):
     resp = requests.post(
@@ -229,7 +216,7 @@ def post(text):
     )
     return resp.json()
 
-# ── Main ─────────────────────────────────────────────────────────────────────────────
+# ── Main ──────────────────────────────────────────────────────────────────────────────
 
 def main():
     sgt = pytz.timezone("Asia/Singapore")
