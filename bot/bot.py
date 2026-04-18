@@ -215,6 +215,15 @@ def handle_update(update):
 
 def main():
     log.info("Portfolio bot starting; repo=%s branch=%s", GITHUB_REPO, GITHUB_BRANCH)
+    # Clear any existing webhook + drop pending updates so only this instance polls.
+    try:
+        requests.post(
+            f"{TG_API}/deleteWebhook",
+            params={"drop_pending_updates": "true"},
+            timeout=30,
+        )
+    except Exception as e:
+        log.warning("deleteWebhook failed: %s", e)
     offset = None
     while True:
         try:
