@@ -23,12 +23,10 @@ import time
 import requests
 import anthropic
 
-# ── Config ──────────────────────────────────────────────────────────────────
-
 BOT_TOKEN      = os.environ["TELEGRAM_BOT_TOKEN"]
 ANTHROPIC_KEY  = os.environ["ANTHROPIC_API_KEY"]
 GITHUB_TOKEN   = os.environ["GITHUB_TOKEN"]
-GITHUB_REPO    = os.environ["GITHUB_REPO"]               # e.g. darylwui/telegrambot1
+GITHUB_REPO    = os.environ["GITHUB_REPO"]
 GITHUB_BRANCH  = os.environ.get("GITHUB_BRANCH", "master")
 PORTFOLIO_PATH = os.environ.get("PORTFOLIO_PATH", "portfolio.json")
 CLAUDE_MODEL   = os.environ.get("CLAUDE_MODEL", "claude-opus-4-7")
@@ -39,7 +37,6 @@ GH_API = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{PORTFOLIO_PATH}"
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("portfolio-bot")
 
-# ── Telegram helpers ───────────────────────────────────────────────────────────────
 
 def tg_get(method, **params):
     r = requests.get(f"{TG_API}/{method}", params=params, timeout=60)
@@ -58,7 +55,6 @@ def tg_download_file(file_id):
     url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{path}"
     return requests.get(url, timeout=60).content
 
-# ── Parsers ─────────────────────────────────────────────────────────────────────
 
 def parse_photo(image_bytes, mime="image/jpeg"):
     client = anthropic.Anthropic(api_key=ANTHROPIC_KEY)
@@ -115,7 +111,6 @@ def parse_csv(csv_bytes):
         positions.append({"ticker": t, "shares": shares, "cost": cost})
     return {"positions": positions}
 
-# ── GitHub commit ────────────────────────────────────────────────────────────────────
 
 def commit_portfolio(portfolio):
     portfolio["updated"] = datetime.datetime.utcnow().strftime("%Y-%m-%d")
@@ -141,7 +136,6 @@ def commit_portfolio(portfolio):
     r.raise_for_status()
     return r.json()
 
-# ── Message handler ────────────────────────────────────────────────────────────────
 
 def summarize(portfolio):
     ps = portfolio["positions"]
@@ -149,9 +143,9 @@ def summarize(portfolio):
     for p in ps[:30]:
         sh = p["shares"]
         sh_s = f"{int(sh)}" if float(sh).is_integer() else f"{sh}"
-        lines.append(f"• <b>{p['ticker']}</b>  {sh_s}@${p['cost']:.2f}")
+        lines.append(f"\u2022 <b>{p['ticker']}</b>  {sh_s}@${p['cost']:.2f}")
     if len(ps) > 30:
-        lines.append(f"… and {len(ps) - 30} more")
+        lines.append(f"\u2026 and {len(ps) - 30} more")
     return "\n".join(lines)
 
 def handle_update(update):
@@ -166,7 +160,7 @@ def handle_update(update):
         if "photo" in msg:
             file_id = msg["photo"][-1]["file_id"]
             img = tg_download_file(file_id)
-            tg_send(chat_id, "\u23f3 Parsing screenshot with Claude…")
+            tg_send(chat_id, "\u23f3 Parsing screenshot with Claude\u2026")
             portfolio = parse_photo(img, mime="image/jpeg")
 
         elif "document" in msg:
@@ -175,10 +169,10 @@ def handle_update(update):
             mime = doc.get("mime_type") or ""
             data = tg_download_file(doc["file_id"])
             if name.endswith(".csv") or "csv" in mime:
-                tg_send(chat_id, "\u23f3 Parsing CSV…")
+                tg_send(chat_id, "\u23f3 Parsing CSV\u2026")
                 portfolio = parse_csv(data)
             elif mime.startswith("image/"):
-                tg_send(chat_id, "\u23f3 Parsing image with Claude…")
+                tg_send(chat_id, "\u23f3 Parsing image with Claude\u2026")
                 portfolio = parse_photo(data, mime=mime)
             else:
                 tg_send(chat_id, "Please send a portfolio screenshot (photo) or a CSV.")
@@ -208,10 +202,17 @@ def handle_update(update):
         log.exception("handler error")
         tg_send(chat_id, f"\u274c Error: {e}")
 
-# ── Poll loop ───────────────────────────────────────────────────────────────────
 
 def main():
     log.info("Portfolio bot starting; repo=%s branch=%s", GITHUB_REPO, GITHUB_BRANCH)
+    try:
+        requests.post(
+            f"{TG_API}/deleteWebhook",
+            params={"drop_pending_updates": "true"},
+            timeout=30,
+        )
+    except Exception as e:
+        log.warning("deleteWebhook failed: %s", e)
     offset = None
     while True:
         try:
