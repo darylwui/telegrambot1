@@ -2,7 +2,7 @@ name: Daily Stock Watch
 
 on:
   schedule:
-    - cron: '0 0 * * 2-6'  # 08:00 SGT (UTC+8) = 00:00 UTC, Tue–Sat
+    - cron: '17 0 * * 2-6'  # 08:17 SGT (UTC+8), Tue–Sat
   workflow_dispatch:
 
 jobs:
