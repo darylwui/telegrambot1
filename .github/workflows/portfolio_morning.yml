@@ -2,7 +2,7 @@ name: Portfolio Watch (Morning)
 
 on:
   schedule:
-    - cron: '0 0 * * 2-6'   # 08:00 SGT (UTC+8), Tue–Sat
+    - cron: '23 0 * * 2-6'   # 08:23 SGT (UTC+8), Tue–Sat
   workflow_dispatch:
 
 jobs:
