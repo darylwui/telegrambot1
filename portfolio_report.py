@@ -5,7 +5,7 @@ Portfolio report: reads portfolio.json, fetches live prices + analyst data
 summary to the Portfolio Telegram chat. No hand-maintained files.
 
 Runs twice daily via GitHub Actions:
-  - Tue-Sat 08:00 SGT (00:00 UTC)
+  - Tue-Sat 08:17 SGT (00:17 UTC)
   - Mon-Fri 20:00 SGT (12:00 UTC)
 """
 import datetime
@@ -121,6 +121,62 @@ def fetch_snapshot(ticker, current_px):
     return out
 
 
+def score_position(ticker, px, pnl_pct, target_mean, analyst_rating, portfolio_pct):
+    """
+    Assign Buy/Hold/Sell recommendation based on multiple signals.
+    Returns (action, reasoning)
+    """
+    if px is None or target_mean is None:
+        return "HOLD", "Incomplete data"
+    
+    # Upside/downside to target
+    upside = (target_mean - px) / px * 100
+    
+    # Normalize analyst rating (Yahoo keys: strong buy, buy, hold, sell, strong sell)
+    rating_score = 0  # 0 = hold/unknown, +2 = buy, +3 = strong buy, -1 = sell, -2 = strong sell
+    if analyst_rating:
+        r = analyst_rating.lower()
+        if "strong buy" in r:
+            rating_score = 3
+        elif "buy" in r:
+            rating_score = 2
+        elif "hold" in r:
+            rating_score = 0
+        elif "sell" in r:
+            rating_score = -2 if "strong" in r else -1
+    
+    # Decision logic
+    reasons = []
+    
+    # SELL signals
+    if upside <= -15 and rating_score < 0:
+        return "SELL", "Below target + bearish analyst"
+    if px >= target_mean and portfolio_pct > 15:
+        return "TRIM", f"At target + oversized ({portfolio_pct:.0f}% of portfolio)"
+    if pnl_pct >= 25 and portfolio_pct > 15:
+        return "TRIM", f"Significant profit + oversized ({portfolio_pct:.0f}% of portfolio)"
+    
+    # BUY signals
+    if upside >= 20 and rating_score >= 1:
+        return "BUY", f"Strong upside ({upside:.0f}%) + bullish analyst"
+    if upside >= 15 and rating_score >= 2:
+        return "BUY", f"Upside ({upside:.0f}%) + buy rating"
+    if pnl_pct <= -20 and rating_score >= 1:
+        return "BUY", "Deeply underwater + bullish thesis (avg down)"
+    if upside >= 15:
+        return "BUY", f"Meaningful upside ({upside:.0f}%) to target"
+    
+    # HOLD is default
+    if px >= target_mean:
+        return "HOLD", "At/above target — monitor for exit"
+    if 5 <= upside < 15:
+        return "HOLD", f"Moderate upside ({upside:.0f}%) — on track"
+    if upside < 0 and rating_score >= 1:
+        return "HOLD", f"Slight downside but bullish thesis ({upside:.0f}%)"
+    
+    return "HOLD", "Balanced thesis"
+
+
 def build_message(portfolio, prices, snapshots, date_str, session_label):
     positions = portfolio["positions"]
     lines = [f"<b>\U0001f4bc Portfolio Watch \u2014 {date_str} {session_label}</b>"]
@@ -161,6 +217,35 @@ def build_message(portfolio, prices, snapshots, date_str, session_label):
     for w in MACRO["watch"]:
         lines.append(f"  \U0001f4cc {w}")
 
+    # === NEW: Build Buy/Hold/Sell recommendations ===
+    recommendations = {"BUY": [], "HOLD": [], "TRIM": [], "SELL": []}
+    
+    for t, sh, c, px, pnl, pct in rows:
+        if px is None:
+            continue
+        portfolio_pct = (sh * px / total_value * 100) if total_value else 0
+        snap = snapshots.get(t) or {}
+        target = snap.get("target_mean")
+        analyst = snap.get("analyst")
+        # Extract rating from analyst string (e.g., "Buy | 15 analysts | PT $150 (+20%)")
+        analyst_rating = analyst.split("|")[0].strip() if analyst else ""
+        
+        action, reason = score_position(t, px, pct, target, analyst_rating, portfolio_pct)
+        recommendations[action].append((t, action, reason, portfolio_pct))
+    
+    # Print recommendations
+    if any(recommendations.values()):
+        lines.append("")
+        lines.append("<b>\U0001f3af Buy/Hold/Sell</b>")
+        
+        for action in ["BUY", "TRIM", "SELL", "HOLD"]:
+            if recommendations[action]:
+                emoji = {"BUY": "\U0001f310", "HOLD": "⏸", "TRIM": "\u2b07\ufe0f", "SELL": "\U0001f4a5"}[action]
+                lines.append(f"\n<b>{emoji} {action}</b>")
+                for t, _, reason, pct in recommendations[action]:
+                    lines.append(f"  \u2022 <b>{t}</b> ({pct:.1f}% of portfolio) — {reason}")
+
+    # === Position details ===
     for t, sh, c, px, pnl, pct in rows:
         lines.append("")
         if px is None:
