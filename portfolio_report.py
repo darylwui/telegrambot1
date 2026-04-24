@@ -5,7 +5,7 @@ Portfolio report: reads portfolio.json, fetches live prices + analyst data
 summary to the Portfolio Telegram chat. No hand-maintained files.
 
 Runs twice daily via GitHub Actions:
-  - Tue-Sat 08:17 SGT (00:17 UTC)
+  - Tue-Sat 08:23 SGT (00:23 UTC)
   - Mon-Fri 20:00 SGT (12:00 UTC)
 """
 import datetime
@@ -23,6 +23,7 @@ BOT_TOKEN = os.environ["PORTFOLIO_BOT_TOKEN"]
 CHAT_ID   = os.environ["PORTFOLIO_CHAT_ID"]
 
 PORTFOLIO_FILE = "portfolio.json"
+ACTIONS_FILE = "portfolio_actions.json"
 
 from macro_config import MACRO
 
@@ -30,6 +31,17 @@ from macro_config import MACRO
 def load_portfolio():
     with open(PORTFOLIO_FILE) as f:
         return json.load(f)
+
+
+def load_actions():
+    """Load recommended portfolio actions."""
+    if not os.path.exists(ACTIONS_FILE):
+        return {"actions": []}
+    try:
+        with open(ACTIONS_FILE) as f:
+            return json.load(f)
+    except Exception:
+        return {"actions": []}
 
 
 def get_prices(tickers):
@@ -217,7 +229,7 @@ def build_message(portfolio, prices, snapshots, date_str, session_label):
     for w in MACRO["watch"]:
         lines.append(f"  \U0001f4cc {w}")
 
-    # === NEW: Build Buy/Hold/Sell recommendations ===
+    # === Buy/Hold/Sell recommendations ===
     recommendations = {"BUY": [], "HOLD": [], "TRIM": [], "SELL": []}
     
     for t, sh, c, px, pnl, pct in rows:
@@ -278,6 +290,53 @@ def build_message(portfolio, prices, snapshots, date_str, session_label):
                 lines.append(f"\U0001f4f0 <a href=\"{url}\">{title}</a>{pub}")
             else:
                 lines.append(f"\U0001f4f0 {title}{pub}")
+
+    # === NEW: Action plan section ===
+    actions_config = load_actions()
+    if actions_config.get("actions"):
+        lines.append("")
+        lines.append("<b>\U0001f4d1 Action Plan</b>")
+        
+        action_lines = []
+        for action in actions_config["actions"]:
+            t = action["ticker"]
+            act_type = action["action"]  # TRIM, BUY, SELL
+            sh = action["shares"]
+            thesis = action["thesis"]
+            
+            # Find current position
+            current_px = prices.get(t)
+            current_shares = None
+            for p in portfolio["positions"]:
+                if p["ticker"] == t:
+                    current_shares = p["shares"]
+                    break
+            
+            if current_px and current_shares is not None:
+                if act_type == "TRIM":
+                    new_shares = current_shares - sh
+                    cash_raised = sh * current_px
+                    action_lines.append(
+                        f"<b>\u2b07\ufe0f {t}:</b> Trim {sh} shares (${cash_raised:,.0f} proceeds) "
+                        f"→ {new_shares} shares remain. {thesis}"
+                    )
+                elif act_type == "BUY":
+                    new_shares = current_shares + sh
+                    capital_needed = sh * current_px
+                    action_lines.append(
+                        f"<b>\U0001f310 {t}:</b> Add {sh} shares (${capital_needed:,.0f} capital) "
+                        f"→ {new_shares} shares total. {thesis}"
+                    )
+                elif act_type == "SELL":
+                    cash_raised = sh * current_px
+                    new_shares = current_shares - sh
+                    action_lines.append(
+                        f"<b>\U0001f4a5 {t}:</b> Exit {sh} shares (${cash_raised:,.0f} proceeds) "
+                        f"→ {new_shares} shares remain. {thesis}"
+                    )
+        
+        for line in action_lines:
+            lines.append(line)
 
     return "\n".join(lines)
 
