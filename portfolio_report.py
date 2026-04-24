@@ -192,7 +192,7 @@ def generate_actions(portfolio, prices, snapshots, total_value):
         
         snap = snapshots.get(t) or {}
         target = snap.get("target_mean")
-        rating = snap.get("rating", "")
+        analyst = snap.get("analyst", "")
         cost = p["cost"]
         cost_basis = shares * cost
         pnl = position_value - cost_basis
@@ -200,10 +200,10 @@ def generate_actions(portfolio, prices, snapshots, total_value):
         
         upside = ((target - px) / px * 100) if target and px else 0
         
-        # Determine rating score
+        # Extract rating from analyst string (e.g., "Buy | 15 analysts | PT $150")
         rating_score = 0
-        if rating:
-            r = rating.lower()
+        if analyst:
+            r = analyst.split("|")[0].strip().lower()
             if "strong buy" in r:
                 rating_score = 3
             elif "buy" in r:
@@ -214,7 +214,6 @@ def generate_actions(portfolio, prices, snapshots, total_value):
                 rating_score = -2 if "strong" in r else -1
         
         # === TRIM LOGIC ===
-        # Trim if: oversized (>20%) + profitable (>15%) OR at target + oversized (>15%)
         if portfolio_pct > 20 and pnl_pct > 15:
             trim_shares = max(1, int(shares * 0.25))  # Trim ~25%
             thesis = (
@@ -241,11 +240,10 @@ def generate_actions(portfolio, prices, snapshots, total_value):
             })
         
         # === BUY LOGIC ===
-        # Buy if: strong upside (>20%) + bullish OR underwater (-30%+) + bullish OR meaningful upside + micro position
         elif upside >= 20 and rating_score >= 1 and target:
             buy_shares = max(1, int(shares * 0.15))  # Add ~15%
             thesis = (
-                f"{rating} | +{upside:.0f}% upside to ${target:.0f}. "
+                f"+{upside:.0f}% upside to ${target:.0f}. "
                 f"Strong conviction — accumulate on weakness."
             )
             actions.append({
@@ -257,7 +255,7 @@ def generate_actions(portfolio, prices, snapshots, total_value):
         elif pnl_pct <= -30 and rating_score >= 1 and target:
             buy_shares = max(1, int(shares * 0.10))  # Add ~10%
             thesis = (
-                f"Oversold at {pnl_pct:.0f}% P&L. {rating} analyst sees +{upside:.0f}% upside. "
+                f"Oversold at {pnl_pct:.0f}% P&L. +{upside:.0f}% analyst upside. "
                 f"Average down conviction trade."
             )
             actions.append({
@@ -271,7 +269,7 @@ def generate_actions(portfolio, prices, snapshots, total_value):
             buy_shares = max(1, int(shares * 0.20))
             thesis = (
                 f"Micro position ({portfolio_pct:.1f}%) with +{upside:.0f}% upside. "
-                f"{rating} — increase conviction bet size."
+                f"Increase conviction bet size."
             )
             actions.append({
                 "ticker": t,
