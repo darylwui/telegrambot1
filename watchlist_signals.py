@@ -204,6 +204,51 @@ def _fetch_history(ticker: str, period: str) -> Optional[pd.DataFrame]:
     return df
 
 
+def _fetch_fundamentals(ticker: str) -> dict:
+    """Best-effort fundamental snapshot from yfinance.info. Pure facts, no opinion."""
+    out = {
+        "market_cap": None, "fifty_two_high": None, "fifty_two_low": None,
+        "beta": None, "revenue_ttm": None, "cash": None, "debt": None,
+        "ps_ratio": None, "short_pct_float": None,
+    }
+    try:
+        info = yf.Ticker(ticker).info or {}
+    except Exception as e:
+        print(f"[watchlist] info fetch failed for {ticker}: {e}")
+        return out
+    out["market_cap"] = info.get("marketCap")
+    out["fifty_two_high"] = info.get("fiftyTwoWeekHigh")
+    out["fifty_two_low"] = info.get("fiftyTwoWeekLow")
+    out["beta"] = info.get("beta")
+    out["revenue_ttm"] = info.get("totalRevenue")
+    out["cash"] = info.get("totalCash")
+    out["debt"] = info.get("totalDebt")
+    out["ps_ratio"] = info.get("priceToSalesTrailing12Months")
+    out["short_pct_float"] = info.get("shortPercentOfFloat")
+    return out
+
+
+def _fmt_money(n) -> str:
+    """Compact dollar formatting: 1234567890 -> '$1.23B'."""
+    if n is None:
+        return "—"
+    try:
+        n = float(n)
+    except Exception:
+        return "—"
+    sign = "-" if n < 0 else ""
+    n = abs(n)
+    if n >= 1e12:
+        return f"{sign}${n / 1e12:.2f}T"
+    if n >= 1e9:
+        return f"{sign}${n / 1e9:.2f}B"
+    if n >= 1e6:
+        return f"{sign}${n / 1e6:.0f}M"
+    if n >= 1e3:
+        return f"{sign}${n / 1e3:.0f}K"
+    return f"{sign}${n:.0f}"
+
+
 def _evaluate_one(df: pd.DataFrame, sname: str) -> dict:
     strat = STRATEGIES[sname]()
     sig = strat(df).reindex(df.index).fillna(0).clip(lower=0).astype(int)
@@ -252,6 +297,7 @@ def _evaluate_ticker(ticker: str, df: pd.DataFrame, strategies: list[str]) -> di
         "atr14": round(atr_v, 3),
         "rsi14": round(rsi_v, 1),
         "strategies": strat_state,
+        "fundamentals": _fetch_fundamentals(ticker),
     }
 
 
@@ -294,7 +340,50 @@ def _consensus_summary(strategies: dict) -> tuple[str, str]:
     return "🔴", f"{on}/{total} rules ON · all quiet"
 
 
-def _render(report: dict, flips: list[str]) -> str:
+def _fundamentals_lines(fund: dict) -> list[str]:
+    """Two compact lines of factual fundamentals. Skips when nothing is available."""
+    if not fund:
+        return []
+    out = []
+    parts1 = []
+    if fund.get("market_cap"):
+        parts1.append(f"Mkt cap {_fmt_money(fund['market_cap'])}")
+    if fund.get("fifty_two_low") and fund.get("fifty_two_high"):
+        parts1.append(f"52w ${fund['fifty_two_low']:.2f}–${fund['fifty_two_high']:.2f}")
+    if fund.get("beta") is not None:
+        parts1.append(f"β {fund['beta']:.2f}")
+    if parts1:
+        out.append(f"  📊 {' · '.join(parts1)}")
+
+    parts2 = []
+    if fund.get("revenue_ttm"):
+        parts2.append(f"Rev (TTM) {_fmt_money(fund['revenue_ttm'])}")
+    if fund.get("cash") is not None:
+        parts2.append(f"Cash {_fmt_money(fund['cash'])}")
+    if fund.get("debt") is not None:
+        parts2.append(f"Debt {_fmt_money(fund['debt'])}")
+    if fund.get("ps_ratio") is not None:
+        parts2.append(f"P/S {fund['ps_ratio']:.1f}×")
+    if parts2:
+        out.append(f"  💰 {' · '.join(parts2)}")
+    return out
+
+
+def _thesis_lines(thesis: dict) -> list[str]:
+    """Bull/bear lines if present and non-empty."""
+    if not thesis:
+        return []
+    out = []
+    bull = (thesis.get("bull") or "").strip()
+    bear = (thesis.get("bear") or "").strip()
+    if bull:
+        out.append(f"  🐂 <b>Bull:</b> {html.escape(bull)}")
+    if bear:
+        out.append(f"  🐻 <b>Bear:</b> {html.escape(bear)}")
+    return out
+
+
+def _render(report: dict, flips: list[str], thesis_cfg: dict) -> str:
     lines = ["<b>📡 Strategy Watchlist</b>"]
 
     if flips:
@@ -315,6 +404,15 @@ def _render(report: dict, flips: list[str]) -> str:
         )
         lines.append(f"  {emoji} {summary}")
 
+        # Fundamentals snapshot
+        for fline in _fundamentals_lines(data.get("fundamentals") or {}):
+            lines.append(fline)
+
+        # User-authored bull/bear
+        for tline in _thesis_lines(thesis_cfg.get(ticker) or {}):
+            lines.append(tline)
+
+        # Strategy state
         for sname, s in data["strategies"].items():
             display = STRATEGY_DISPLAY.get(sname, sname)
             flip_date = _friendly_date(s["last_flip_date"])
@@ -335,8 +433,8 @@ def _render(report: dict, flips: list[str]) -> str:
     lines.append(
         "<i>How to read: ✅ ON = your rule is currently signaling, with the "
         "entry price and unrealized return shown. ⏸ OFF = rule is quiet. "
-        "These are rule states, not buy/sell calls. Edit watchlist.json or "
-        "watchlist_signals.py to change tickers/rules.</i>"
+        "Bull/Bear text is yours — edit thesis fields in watchlist.json. "
+        "These are rule states, not buy/sell calls.</i>"
     )
     return "\n".join(lines)
 
@@ -402,7 +500,8 @@ def build_watchlist_section() -> Optional[str]:
     prev = _load_state()
     flips = _diff_flips(prev, report)
 
-    section = _render(report, flips)
+    thesis_cfg = cfg.get("thesis") or {}
+    section = _render(report, flips, thesis_cfg)
 
     try:
         _save_state(report)
