@@ -153,6 +153,19 @@ STRATEGIES: dict[str, Callable[[], Callable]] = {
     "atr_trail":      lambda: _atr_trailing_stop(),
 }
 
+# Plain-English display names for the Telegram message.
+STRATEGY_DISPLAY: dict[str, str] = {
+    "donchian_20_10": "20-day breakout",
+    "donchian_55_20": "55-day breakout",
+    "sma_10_30":      "Fast trend (10/30 MA)",
+    "sma_20_50":      "Mid trend (20/50 MA)",
+    "sma_50_200":     "Long trend (50/200 MA)",
+    "ema_12_26":      "EMA cross (12/26)",
+    "macd":           "MACD momentum",
+    "trend_filter":   "Confirmed trend (20/50 + 200)",
+    "atr_trail":      "Trend + ATR trailing stop",
+}
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # STATE — persisted across runs so we can detect flips
@@ -246,41 +259,84 @@ def _evaluate_ticker(ticker: str, df: pd.DataFrame, strategies: list[str]) -> di
 # RENDERING
 # ─────────────────────────────────────────────────────────────────────────────
 
+_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+
+def _friendly_date(date_str: str) -> str:
+    """'2026-04-14' -> 'Apr 14'. Adds year suffix if not the current year."""
+    try:
+        from datetime import date
+        d = date.fromisoformat(date_str)
+        today = date.today()
+        if d.year == today.year:
+            return f"{_MONTHS[d.month - 1]} {d.day}"
+        return f"{_MONTHS[d.month - 1]} {d.day} '{str(d.year)[2:]}"
+    except Exception:
+        return date_str
+
+
+def _consensus_summary(strategies: dict) -> tuple[str, str]:
+    """Return (emoji, label) summarizing how many rules are ON."""
+    total = len(strategies)
+    on = sum(1 for s in strategies.values() if s.get("state") == "LONG")
+    if total == 0:
+        return "⚪", f"{on}/{total} rules ON"
+    pct = on / total
+    if pct == 1.0:
+        return "🟢", f"{on}/{total} rules ON · all aligned"
+    if pct >= 0.8:
+        return "🟢", f"{on}/{total} rules ON · mostly aligned"
+    if pct >= 0.5:
+        return "🟡", f"{on}/{total} rules ON · mixed"
+    if pct > 0:
+        return "🟠", f"{on}/{total} rules ON · mostly quiet"
+    return "🔴", f"{on}/{total} rules ON · all quiet"
+
+
 def _render(report: dict, flips: list[str]) -> str:
     lines = ["<b>📡 Strategy Watchlist</b>"]
+
+    if flips:
+        lines.append("")
+        lines.append("<b>⚡ Changed since last run</b>")
+        for f in flips:
+            lines.append(f"  • {html.escape(f)}")
 
     for ticker, data in report["tickers"].items():
         if "error" in data:
             lines.append(f"\n<b>{ticker}</b> — error: {html.escape(str(data['error']))}")
             continue
+
+        emoji, summary = _consensus_summary(data["strategies"])
         lines.append(
             f"\n<b>{ticker}</b> ${data['close']:.2f} · "
-            f"ATR(14) {data['atr14']} · RSI {data['rsi14']:.1f} · {data['as_of']}"
+            f"RSI {data['rsi14']:.0f} · ATR(14) {data['atr14']:.2f}"
         )
+        lines.append(f"  {emoji} {summary}")
+
         for sname, s in data["strategies"].items():
+            display = STRATEGY_DISPLAY.get(sname, sname)
+            flip_date = _friendly_date(s["last_flip_date"])
             if s["state"] == "LONG":
                 entry = s["entry_price_if_long"]
                 ur = s["unrealized_pct"]
                 ur_sign = "+" if (ur is not None and ur >= 0) else ""
                 lines.append(
-                    f"  ⚙️ {sname}: <b>LONG</b> since {s['last_flip_date']} "
+                    f"    ✅ <b>{display}</b> — ON since {flip_date} "
                     f"(entry ${entry:.2f}, {ur_sign}{ur:.1f}%)"
                 )
             else:
                 lines.append(
-                    f"  ⚙️ {sname}: FLAT since {s['last_flip_date']}"
+                    f"    ⏸ {display} — OFF since {flip_date}"
                 )
-
-    if flips:
-        lines.append("")
-        lines.append("<b>⚡ Recent flips since last run</b>")
-        for f in flips:
-            lines.append(f"  • {html.escape(f)}")
 
     lines.append("")
     lines.append(
-        "<i>Watchlist signals reflect rules in watchlist_signals.py — "
-        "not buy/sell calls. Edit watchlist.json to change tickers/strategies.</i>"
+        "<i>How to read: ✅ ON = your rule is currently signaling, with the "
+        "entry price and unrealized return shown. ⏸ OFF = rule is quiet. "
+        "These are rule states, not buy/sell calls. Edit watchlist.json or "
+        "watchlist_signals.py to change tickers/rules.</i>"
     )
     return "\n".join(lines)
 
