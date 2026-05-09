@@ -1,0 +1,12 @@
+{
+  "_comment": "Watchlist for strategy-based signal monitoring. Tickers and strategies are yours to edit. State persists across runs in watchlist_state.json so flips can be flagged.",
+  "tickers": ["IONQ", "ONDS"],
+  "strategies": [
+    "donchian_20_10",
+    "sma_20_50",
+    "trend_filter",
+    "macd",
+    "atr_trail"
+  ],
+  "data_period": "400d"
+}
