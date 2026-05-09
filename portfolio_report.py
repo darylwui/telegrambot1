@@ -36,6 +36,12 @@ import yfinance as yf
 from clusters import CLUSTERS, SINGLE_NAME_THRESHOLD, CLUSTER_THRESHOLD, classify
 from macro_config import MACRO
 
+try:
+    from watchlist_signals import build_watchlist_section
+except Exception as _e:
+    build_watchlist_section = None
+    print(f"watchlist_signals unavailable: {_e}")
+
 BOT_TOKEN = os.environ.get("PORTFOLIO_BOT_TOKEN", "")
 CHAT_ID = os.environ.get("PORTFOLIO_CHAT_ID", "")
 BRIEF_REPO_TOKEN = os.environ.get("BRIEF_REPO_TOKEN", "")
@@ -813,6 +819,16 @@ def build_message(portfolio, prices, snapshots, indicators, history_state, brief
     if plan:
         lines.append("")
         lines.append(plan)
+
+    # ── Strategy watchlist (rule-state only, separate from portfolio) ──
+    if build_watchlist_section is not None:
+        try:
+            watchlist_section = build_watchlist_section()
+            if watchlist_section:
+                lines.append("")
+                lines.append(watchlist_section)
+        except Exception as e:
+            print(f"watchlist section failed: {e}")
 
     lines.append("")
     lines.append("<i>⚠️ Not financial advice — your call, your risk.</i>")

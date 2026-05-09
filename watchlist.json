@@ -1,0 +1,22 @@
+{
+  "_comment": "Watchlist for strategy-based signal monitoring. Tickers, strategies, and theses are yours to edit. The 'thesis' values are STARTER drafts of common market talking points — review and rewrite to your own view. State persists across runs in watchlist_state.json so flips can be flagged.",
+  "tickers": ["IONQ", "ONDS"],
+  "strategies": [
+    "donchian_20_10",
+    "sma_20_50",
+    "trend_filter",
+    "macd",
+    "atr_trail"
+  ],
+  "data_period": "400d",
+  "thesis": {
+    "IONQ": {
+      "bull": "Pure-play public quantum exposure on trapped-ion architecture; cloud partnerships (AWS Braket, Azure Quantum, Google Cloud) drive early compute-time revenue; ~$2B cash runway extends viability past commercial-utility milestones; recent stack-extending M&A (Lightsynq photonics, Qubitekk networking, Oxford Ionics).",
+      "bear": "Pre-commercial revenue (~$190M TTM on ~$18B mcap = >100× sales); profitability years away; competition from superconducting (IBM, Google) and neutral-atom (QuEra, Atom Computing); narrative-driven; β~3.0 means market drawdowns are amplified."
+    },
+    "ONDS": {
+      "bull": "Two-segment exposure — private wireless FullMAX for rail/critical infra + drone autonomy (Airobotics Optimus, American Robotics Scout); defense/border drone tailwinds; recent contract wins in rail and government programs.",
+      "bear": "Persistent dilution history funds ops; revenue still small (~$50M TTM on ~$4B mcap = ~80× sales); contract-announcement-driven volatility; profitability not in sight; small-cap liquidity risk; concentration risk on a handful of programs."
+    }
+  }
+}
