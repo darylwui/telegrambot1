@@ -2,27 +2,27 @@
   "tickers": {
     "IONQ": {
       "as_of": "2026-05-19",
-      "close": 46.91,
-      "atr14": 4.349,
-      "rsi14": 50.4,
+      "close": 48.44,
+      "atr14": 4.358,
+      "rsi14": 52.7,
       "strategies": {
         "donchian_20_10": {
           "state": "LONG",
           "last_flip_date": "2026-04-14",
           "entry_price_if_long": 38.36,
-          "unrealized_pct": 22.3
+          "unrealized_pct": 26.28
         },
         "sma_20_50": {
           "state": "LONG",
           "last_flip_date": "2026-04-22",
           "entry_price_if_long": 46.61,
-          "unrealized_pct": 0.65
+          "unrealized_pct": 3.93
         },
         "trend_filter": {
-          "state": "FLAT",
-          "last_flip_date": "2026-05-19",
-          "entry_price_if_long": null,
-          "unrealized_pct": null
+          "state": "LONG",
+          "last_flip_date": "2026-05-05",
+          "entry_price_if_long": 49.1,
+          "unrealized_pct": -1.34
         },
         "macd": {
           "state": "FLAT",
@@ -34,26 +34,26 @@
           "state": "LONG",
           "last_flip_date": "2026-04-22",
           "entry_price_if_long": 46.61,
-          "unrealized_pct": 0.65
+          "unrealized_pct": 3.93
         }
       },
       "fundamentals": {
-        "market_cap": 17513826304,
+        "market_cap": 18081196032,
         "fifty_two_high": 84.64,
         "fifty_two_low": 25.89,
         "beta": 3.052,
         "revenue_ttm": 187118000,
         "cash": 2033469952,
         "debt": 30443000,
-        "ps_ratio": 93.59776,
+        "ps_ratio": 96.62991,
         "short_pct_float": 0.22549999
       }
     },
     "ONDS": {
       "as_of": "2026-05-19",
-      "close": 9.09,
+      "close": 9.12,
       "atr14": 0.959,
-      "rsi14": 45.0,
+      "rsi14": 45.2,
       "strategies": {
         "donchian_20_10": {
           "state": "FLAT",
@@ -77,7 +77,7 @@
           "state": "LONG",
           "last_flip_date": "2026-05-14",
           "entry_price_if_long": 10.91,
-          "unrealized_pct": -16.73
+          "unrealized_pct": -16.36
         },
         "atr_trail": {
           "state": "FLAT",
@@ -87,14 +87,14 @@
         }
       },
       "fundamentals": {
-        "market_cap": 4504003584,
+        "market_cap": 4523834368,
         "fifty_two_high": 15.28,
         "fifty_two_low": 0.828,
         "beta": 2.556,
         "revenue_ttm": 50731000,
         "cash": 572494016,
         "debt": 25209000,
-        "ps_ratio": 88.782074,
+        "ps_ratio": 89.17298,
         "short_pct_float": 0.3396
       }
     }
