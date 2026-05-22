@@ -1,59 +1,59 @@
 {
   "tickers": {
     "IONQ": {
-      "as_of": "2026-05-21",
-      "close": 58.89,
-      "atr14": 4.667,
-      "rsi14": 65.1,
+      "as_of": "2026-05-22",
+      "close": 63.81,
+      "atr14": 4.811,
+      "rsi14": 69.3,
       "strategies": {
         "donchian_20_10": {
           "state": "LONG",
           "last_flip_date": "2026-04-14",
           "entry_price_if_long": 38.36,
-          "unrealized_pct": 53.52
+          "unrealized_pct": 66.35
         },
         "sma_20_50": {
           "state": "LONG",
           "last_flip_date": "2026-04-22",
           "entry_price_if_long": 46.61,
-          "unrealized_pct": 26.35
+          "unrealized_pct": 36.9
         },
         "trend_filter": {
           "state": "LONG",
           "last_flip_date": "2026-05-05",
           "entry_price_if_long": 49.1,
-          "unrealized_pct": 19.94
+          "unrealized_pct": 29.96
         },
         "macd": {
-          "state": "FLAT",
-          "last_flip_date": "2026-05-18",
-          "entry_price_if_long": null,
-          "unrealized_pct": null
+          "state": "LONG",
+          "last_flip_date": "2026-05-22",
+          "entry_price_if_long": 58.0,
+          "unrealized_pct": 10.02
         },
         "atr_trail": {
           "state": "LONG",
           "last_flip_date": "2026-04-22",
           "entry_price_if_long": 46.61,
-          "unrealized_pct": 26.35
+          "unrealized_pct": 36.9
         }
       },
       "fundamentals": {
-        "market_cap": 21981868032,
+        "market_cap": 23736236032,
         "fifty_two_high": 84.64,
         "fifty_two_low": 25.89,
         "beta": 3.052,
         "revenue_ttm": 187118000,
         "cash": 2033469952,
         "debt": 30443000,
-        "ps_ratio": 117.47597,
+        "ps_ratio": 126.8517,
         "short_pct_float": 0.22549999
       }
     },
     "ONDS": {
-      "as_of": "2026-05-21",
-      "close": 9.18,
-      "atr14": 0.884,
-      "rsi14": 45.7,
+      "as_of": "2026-05-22",
+      "close": 9.36,
+      "atr14": 0.847,
+      "rsi14": 47.2,
       "strategies": {
         "donchian_20_10": {
           "state": "FLAT",
@@ -87,14 +87,14 @@
         }
       },
       "fundamentals": {
-        "market_cap": 4551101440,
+        "market_cap": 4640090624,
         "fifty_two_high": 15.28,
         "fifty_two_low": 0.86,
         "beta": 2.556,
-        "revenue_ttm": 50731000,
-        "cash": 572494016,
-        "debt": 25209000,
-        "ps_ratio": 89.710464,
+        "revenue_ttm": 96605000,
+        "cash": 1473844992,
+        "debt": 13160000,
+        "ps_ratio": 48.031578,
         "short_pct_float": 0.3396
       }
     }
