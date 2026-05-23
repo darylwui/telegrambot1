@@ -1,6 +1,6 @@
 {
   "_comment": "Watchlist for strategy-based signal monitoring. Tickers, strategies, and theses are yours to edit. The 'thesis' values are STARTER drafts of common market talking points — review and rewrite to your own view. State persists across runs in watchlist_state.json so flips can be flagged.",
-  "tickers": ["IONQ", "ONDS"],
+  "tickers": ["IONQ", "ONDS", "VRT", "GENB"],
   "strategies": [
     "donchian_20_10",
     "sma_20_50",
@@ -17,6 +17,14 @@
     "ONDS": {
       "bull": "Two-segment exposure — private wireless FullMAX for rail/critical infra + drone autonomy (Airobotics Optimus, American Robotics Scout); defense/border drone tailwinds; recent contract wins in rail and government programs.",
       "bear": "Persistent dilution history funds ops; revenue still small (~$50M TTM on ~$4B mcap = ~80× sales); contract-announcement-driven volatility; profitability not in sight; small-cap liquidity risk; concentration risk on a handful of programs."
+    },
+    "VRT": {
+      "bull": "Core picks-and-shovels for AI/datacenter capex — thermal management, power distribution, UPS, racks; post-Emerson carveout margin expansion + services attach growth; multi-year hyperscaler backlog visibility; widening footprint in liquid cooling as rack densities scale.",
+      "bear": "Already re-rated hard on the AI thesis — multiple compression risk if hyperscaler capex cadence cools; customer concentration in a handful of hyperscalers (MSFT/META/GOOG/AMZN-class); cyclical industrial business carrying a growth multiple; competition from Schneider, Eaton, ABB; supply-chain/component lead-time exposure."
+    },
+    "GENB": {
+      "bull": "Generative-biology platform (Chroma model) applied across antibodies, peptides, enzymes — multiple shots on goal; AI-native drug design positioning in a sector being repriced; pharma partnerships provide non-dilutive funding + external validation; IPO cash extends runway into pipeline readouts.",
+      "bear": "Pre-commercial revenue, clinical risk on every program; crowded AI-bio field (Recursion, Insitro, Isomorphic, Schrödinger, AbCellera) — platform differentiation hard to prove until human data; high burn vs. revenue, secondaries likely if readouts slip; sector-beta (XBI) drives big swings independent of fundamentals; recent IPO → lockup-expiry overhang."
     }
   }
 }
