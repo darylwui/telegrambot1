@@ -2,107 +2,107 @@
   "tickers": {
     "IONQ": {
       "as_of": "2026-05-29",
-      "close": 68.74,
-      "atr14": 5.04,
-      "rsi14": 71.5,
+      "close": 72.07,
+      "atr14": 5.185,
+      "rsi14": 75.5,
       "strategies": {
         "donchian_20_10": {
           "state": "LONG",
           "last_flip_date": "2026-04-14",
           "entry_price_if_long": 38.36,
-          "unrealized_pct": 79.2
+          "unrealized_pct": 87.88
         },
         "sma_20_50": {
           "state": "LONG",
           "last_flip_date": "2026-04-22",
           "entry_price_if_long": 46.61,
-          "unrealized_pct": 47.48
+          "unrealized_pct": 54.62
         },
         "trend_filter": {
           "state": "LONG",
           "last_flip_date": "2026-05-05",
           "entry_price_if_long": 49.1,
-          "unrealized_pct": 40.0
+          "unrealized_pct": 46.78
         },
         "macd": {
           "state": "LONG",
           "last_flip_date": "2026-05-22",
           "entry_price_if_long": 64.3,
-          "unrealized_pct": 6.91
+          "unrealized_pct": 12.08
         },
         "atr_trail": {
           "state": "LONG",
           "last_flip_date": "2026-04-22",
           "entry_price_if_long": 46.61,
-          "unrealized_pct": 47.48
+          "unrealized_pct": 54.62
         }
       },
       "fundamentals": {
-        "market_cap": 25658574848,
+        "market_cap": 26901565440,
         "fifty_two_high": 84.64,
         "fifty_two_low": 25.89,
         "beta": 3.052,
         "revenue_ttm": 187118000,
         "cash": 2033469952,
         "debt": 30443000,
-        "ps_ratio": 137.1251,
+        "ps_ratio": 143.76791,
         "short_pct_float": 0.1974
       }
     },
     "ONDS": {
       "as_of": "2026-05-29",
-      "close": 12.45,
-      "atr14": 1.106,
-      "rsi14": 63.0,
+      "close": 13.22,
+      "atr14": 1.117,
+      "rsi14": 68.6,
       "strategies": {
         "donchian_20_10": {
           "state": "LONG",
           "last_flip_date": "2026-05-28",
-          "entry_price_if_long": 12.74,
-          "unrealized_pct": -2.24
+          "entry_price_if_long": 12.75,
+          "unrealized_pct": 3.69
         },
         "sma_20_50": {
           "state": "LONG",
           "last_flip_date": "2026-05-29",
-          "entry_price_if_long": 12.74,
-          "unrealized_pct": -2.24
+          "entry_price_if_long": 12.75,
+          "unrealized_pct": 3.69
         },
         "trend_filter": {
           "state": "LONG",
           "last_flip_date": "2026-05-29",
-          "entry_price_if_long": 12.74,
-          "unrealized_pct": -2.24
+          "entry_price_if_long": 12.75,
+          "unrealized_pct": 3.69
         },
         "macd": {
           "state": "LONG",
           "last_flip_date": "2026-05-27",
           "entry_price_if_long": 11.475,
-          "unrealized_pct": 8.54
+          "unrealized_pct": 15.21
         },
         "atr_trail": {
           "state": "LONG",
           "last_flip_date": "2026-05-29",
-          "entry_price_if_long": 12.74,
-          "unrealized_pct": -2.24
+          "entry_price_if_long": 12.75,
+          "unrealized_pct": 3.69
         }
       },
       "fundamentals": {
-        "market_cap": 6206078464,
+        "market_cap": 6590026752,
         "fifty_two_high": 15.28,
-        "fifty_two_low": 1.07,
+        "fifty_two_low": 1.26,
         "beta": 2.556,
         "revenue_ttm": 96605000,
         "cash": 1473844992,
         "debt": 7865000,
-        "ps_ratio": 64.24179,
+        "ps_ratio": 68.21621,
         "short_pct_float": 0.3105
       }
     },
     "VRT": {
       "as_of": "2026-05-29",
-      "close": 312.77,
+      "close": 315.71,
       "atr14": 17.209,
-      "rsi14": 44.1,
+      "rsi14": 45.4,
       "strategies": {
         "donchian_20_10": {
           "state": "FLAT",
@@ -114,13 +114,13 @@
           "state": "LONG",
           "last_flip_date": "2026-01-23",
           "entry_price_if_long": 180.9769,
-          "unrealized_pct": 72.82
+          "unrealized_pct": 74.45
         },
         "trend_filter": {
           "state": "LONG",
           "last_flip_date": "2026-01-23",
           "entry_price_if_long": 180.9769,
-          "unrealized_pct": 72.82
+          "unrealized_pct": 74.45
         },
         "macd": {
           "state": "FLAT",
@@ -132,25 +132,25 @@
           "state": "LONG",
           "last_flip_date": "2026-05-21",
           "entry_price_if_long": 333.96,
-          "unrealized_pct": -6.35
+          "unrealized_pct": -5.46
         }
       },
       "fundamentals": {
-        "market_cap": 120137703424,
+        "market_cap": 121266987008,
         "fifty_two_high": 379.935,
-        "fifty_two_low": 104.71,
+        "fifty_two_low": 105.68,
         "beta": 2.099,
         "revenue_ttm": 10843400192,
         "cash": 2500499968,
         "debt": 3264900096,
-        "ps_ratio": 11.079339,
+        "ps_ratio": 11.183483,
         "short_pct_float": 0.0354
       }
     },
     "GENB": {
       "as_of": "2026-05-29",
-      "close": 13.13,
-      "atr14": 1.209,
+      "close": 13.12,
+      "atr14": 1.211,
       "rsi14": 46.8,
       "strategies": {
         "donchian_20_10": {
@@ -163,7 +163,7 @@
           "state": "LONG",
           "last_flip_date": "2026-05-08",
           "entry_price_if_long": 13.65,
-          "unrealized_pct": -3.81
+          "unrealized_pct": -3.88
         },
         "trend_filter": {
           "state": "FLAT",
@@ -181,18 +181,18 @@
           "state": "LONG",
           "last_flip_date": "2026-05-08",
           "entry_price_if_long": 13.65,
-          "unrealized_pct": -3.81
+          "unrealized_pct": -3.88
         }
       },
       "fundamentals": {
-        "market_cap": 1683167232,
+        "market_cap": 1681885312,
         "fifty_two_high": 16.75,
         "fifty_two_low": 11.0,
         "beta": null,
         "revenue_ttm": 30299000,
         "cash": 516640992,
         "debt": 65570000,
-        "ps_ratio": 55.551907,
+        "ps_ratio": 55.509598,
         "short_pct_float": 0.0463
       }
     }
