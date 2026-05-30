@@ -205,11 +205,14 @@ def _fetch_history(ticker: str, period: str) -> Optional[pd.DataFrame]:
 
 
 def _fetch_fundamentals(ticker: str) -> dict:
-    """Best-effort fundamental snapshot from yfinance.info. Pure facts, no opinion."""
+    """Best-effort fundamental + analyst snapshot from yfinance.info. Pure facts, no opinion."""
     out = {
         "market_cap": None, "fifty_two_high": None, "fifty_two_low": None,
         "beta": None, "revenue_ttm": None, "cash": None, "debt": None,
         "ps_ratio": None, "short_pct_float": None,
+        # Analyst consensus — third-party data point, not editorial
+        "rec_key": None, "rec_label": None, "analyst_count": None,
+        "target_mean": None, "target_high": None, "target_low": None,
     }
     try:
         info = yf.Ticker(ticker).info or {}
@@ -225,6 +228,14 @@ def _fetch_fundamentals(ticker: str) -> dict:
     out["debt"] = info.get("totalDebt")
     out["ps_ratio"] = info.get("priceToSalesTrailing12Months")
     out["short_pct_float"] = info.get("shortPercentOfFloat")
+    rec = info.get("recommendationKey") or ""
+    if rec:
+        out["rec_key"] = rec
+        out["rec_label"] = str(rec).replace("_", " ").title()
+    out["analyst_count"] = info.get("numberOfAnalystOpinions")
+    out["target_mean"] = info.get("targetMeanPrice")
+    out["target_high"] = info.get("targetHighPrice")
+    out["target_low"] = info.get("targetLowPrice")
     return out
 
 
@@ -249,6 +260,97 @@ def _fmt_money(n) -> str:
     return f"{sign}${n:.0f}"
 
 
+def _trigger_detail(df: pd.DataFrame, sname: str, state: str) -> str:
+    """
+    Compute a compact 'where would your rule flip' string per strategy.
+
+    Mechanical computation from the rule's own definitions — not a buy
+    recommendation. For Donchian: the literal entry/exit trigger price.
+    For MA-cross rules: current fast/slow values + gap, so the reader can
+    see how close the rule is to flipping. For ATR-trail when ON: the
+    current trailing stop level (HWM × 3 ATR).
+    """
+    close = df["Close"]
+    n_bars = len(df)
+
+    def _pct(a, b):
+        return (a - b) / b * 100 if b else 0.0
+
+    if sname in ("donchian_20_10", "donchian_55_20"):
+        n_in, n_out = (20, 10) if sname == "donchian_20_10" else (55, 20)
+        if n_bars < n_in + 2:
+            return ""
+        prior_high = float(df["High"].iloc[-(n_in + 1):-1].max())
+        prior_low = float(df["Low"].iloc[-(n_out + 1):-1].min())
+        if state == "LONG":
+            cur = float(close.iloc[-1])
+            return f"exit ↓ ${prior_low:.2f} ({_pct(prior_low, cur):+.1f}%)"
+        cur = float(close.iloc[-1])
+        return f"trigger ↑ ${prior_high:.2f} ({_pct(prior_high, cur):+.1f}%)"
+
+    if sname in ("sma_10_30", "sma_20_50", "sma_50_200"):
+        fast, slow = {"sma_10_30": (10, 30), "sma_20_50": (20, 50),
+                      "sma_50_200": (50, 200)}[sname]
+        if n_bars < slow:
+            return ""
+        f_v = float(_sma(close, fast).iloc[-1])
+        s_v = float(_sma(close, slow).iloc[-1])
+        return f"SMA{fast} ${f_v:.2f} · SMA{slow} ${s_v:.2f} · gap {_pct(f_v, s_v):+.1f}%"
+
+    if sname == "ema_12_26":
+        f_v = float(_ema(close, 12).iloc[-1])
+        s_v = float(_ema(close, 26).iloc[-1])
+        return f"EMA12 ${f_v:.2f} · EMA26 ${s_v:.2f} · gap {_pct(f_v, s_v):+.1f}%"
+
+    if sname == "macd":
+        line, sig = _macd(close)
+        l_v = float(line.iloc[-1])
+        s_v = float(sig.iloc[-1])
+        return f"MACD {l_v:+.3f} · signal {s_v:+.3f} · gap {l_v - s_v:+.3f}"
+
+    if sname == "trend_filter":
+        if n_bars < 200:
+            return ""
+        f_v = float(_sma(close, 20).iloc[-1])
+        s_v = float(_sma(close, 50).iloc[-1])
+        r_v = float(_sma(close, 200).iloc[-1])
+        cur = float(close.iloc[-1])
+        return (f"SMA20/50/200 ${f_v:.2f}/${s_v:.2f}/${r_v:.2f} · "
+                f"regime {'✓ above' if cur > r_v else '✗ below'} 200")
+
+    if sname == "atr_trail":
+        f_ser = _sma(close, 20)
+        s_ser = _sma(close, 50)
+        a_ser = _atr(df, 14)
+        if state == "LONG":
+            # Walk forward to find HWM since the active entry
+            pos, hwm = 0, 0.0
+            for i in range(n_bars):
+                c = float(close.iloc[i])
+                if pd.isna(f_ser.iloc[i]) or pd.isna(s_ser.iloc[i]):
+                    continue
+                long_sig = f_ser.iloc[i] > s_ser.iloc[i]
+                atr_v = float(a_ser.iloc[i]) if pd.notna(a_ser.iloc[i]) else 0.0
+                if pos == 0 and long_sig:
+                    pos, hwm = 1, c
+                elif pos == 1:
+                    hwm = max(hwm, c)
+                    stop = hwm - 3.0 * atr_v
+                    if c < stop or not long_sig:
+                        pos, hwm = 0, 0.0
+            if pos == 1:
+                cur_atr = float(a_ser.iloc[-1])
+                stop = hwm - 3.0 * cur_atr
+                cur = float(close.iloc[-1])
+                return f"HWM ${hwm:.2f} · trailing stop ${stop:.2f} ({_pct(stop, cur):+.1f}%)"
+        # OFF — show the SMA cross gap (what would flip the entry)
+        f_v = float(f_ser.iloc[-1])
+        s_v = float(s_ser.iloc[-1])
+        return f"SMA20 ${f_v:.2f} · SMA50 ${s_v:.2f} · gap {_pct(f_v, s_v):+.1f}%"
+
+    return ""
+
+
 def _evaluate_one(df: pd.DataFrame, sname: str) -> dict:
     strat = STRATEGIES[sname]()
     sig = strat(df).reindex(df.index).fillna(0).clip(lower=0).astype(int)
@@ -268,11 +370,18 @@ def _evaluate_one(df: pd.DataFrame, sname: str) -> dict:
     if cur == 1:
         unrealized = (float(df["Close"].iloc[-1]) / entry_px - 1) * 100
 
+    try:
+        trigger = _trigger_detail(df, sname, state)
+    except Exception as e:
+        print(f"[watchlist] trigger detail failed for {sname}: {e}")
+        trigger = ""
+
     return {
         "state": state,
         "last_flip_date": flip_date.strftime("%Y-%m-%d"),
         "entry_price_if_long": round(entry_px, 4) if cur == 1 else None,
         "unrealized_pct": round(unrealized, 2) if unrealized is not None else None,
+        "trigger_detail": trigger,
     }
 
 
@@ -340,8 +449,8 @@ def _consensus_summary(strategies: dict) -> tuple[str, str]:
     return "🔴", f"{on}/{total} rules ON · all quiet"
 
 
-def _fundamentals_lines(fund: dict) -> list[str]:
-    """Two compact lines of factual fundamentals. Skips when nothing is available."""
+def _fundamentals_lines(fund: dict, close: Optional[float] = None) -> list[str]:
+    """Compact lines of factual fundamentals. Skips when nothing is available."""
     if not fund:
         return []
     out = []
@@ -349,7 +458,11 @@ def _fundamentals_lines(fund: dict) -> list[str]:
     if fund.get("market_cap"):
         parts1.append(f"Mkt cap {_fmt_money(fund['market_cap'])}")
     if fund.get("fifty_two_low") and fund.get("fifty_two_high"):
-        parts1.append(f"52w ${fund['fifty_two_low']:.2f}–${fund['fifty_two_high']:.2f}")
+        rng = f"52w ${fund['fifty_two_low']:.2f}–${fund['fifty_two_high']:.2f}"
+        if close and fund.get("fifty_two_high"):
+            pct_off_high = (close - fund["fifty_two_high"]) / fund["fifty_two_high"] * 100
+            rng += f" ({pct_off_high:+.0f}% from high)"
+        parts1.append(rng)
     if fund.get("beta") is not None:
         parts1.append(f"β {fund['beta']:.2f}")
     if parts1:
@@ -366,6 +479,21 @@ def _fundamentals_lines(fund: dict) -> list[str]:
         parts2.append(f"P/S {fund['ps_ratio']:.1f}×")
     if parts2:
         out.append(f"  💰 {' · '.join(parts2)}")
+
+    # Analyst consensus — third-party data point (sell-side aggregate), not editorial
+    parts3 = []
+    if fund.get("rec_label"):
+        parts3.append(fund["rec_label"])
+    if fund.get("analyst_count"):
+        parts3.append(f"{fund['analyst_count']} analysts")
+    if fund.get("target_mean") and close:
+        upside = (fund["target_mean"] - close) / close * 100
+        parts3.append(f"PT ${fund['target_mean']:.2f} ({upside:+.0f}%)")
+    elif fund.get("target_mean"):
+        parts3.append(f"PT ${fund['target_mean']:.2f}")
+    if parts3:
+        out.append(f"  🧠 Analyst: {' · '.join(parts3)}")
+
     return out
 
 
@@ -404,37 +532,41 @@ def _render(report: dict, flips: list[str], thesis_cfg: dict) -> str:
         )
         lines.append(f"  {emoji} {summary}")
 
-        # Fundamentals snapshot
-        for fline in _fundamentals_lines(data.get("fundamentals") or {}):
+        # Fundamentals snapshot + analyst consensus
+        for fline in _fundamentals_lines(data.get("fundamentals") or {}, close=data.get("close")):
             lines.append(fline)
 
         # User-authored bull/bear
         for tline in _thesis_lines(thesis_cfg.get(ticker) or {}):
             lines.append(tline)
 
-        # Strategy state
+        # Strategy state, with trigger detail per rule (where mechanically computable)
         for sname, s in data["strategies"].items():
             display = STRATEGY_DISPLAY.get(sname, sname)
             flip_date = _friendly_date(s["last_flip_date"])
+            trig = s.get("trigger_detail") or ""
+            trig_suffix = f" · {trig}" if trig else ""
             if s["state"] == "LONG":
                 entry = s["entry_price_if_long"]
                 ur = s["unrealized_pct"]
                 ur_sign = "+" if (ur is not None and ur >= 0) else ""
                 lines.append(
                     f"    ✅ <b>{display}</b> — ON since {flip_date} "
-                    f"(entry ${entry:.2f}, {ur_sign}{ur:.1f}%)"
+                    f"(entry ${entry:.2f}, {ur_sign}{ur:.1f}%){trig_suffix}"
                 )
             else:
                 lines.append(
-                    f"    ⏸ {display} — OFF since {flip_date}"
+                    f"    ⏸ {display} — OFF since {flip_date}{trig_suffix}"
                 )
 
     lines.append("")
     lines.append(
-        "<i>How to read: ✅ ON = your rule is currently signaling, with the "
-        "entry price and unrealized return shown. ⏸ OFF = rule is quiet. "
-        "Bull/Bear text is yours — edit thesis fields in watchlist.json. "
-        "These are rule states, not buy/sell calls.</i>"
+        "<i>How to read: ✅ ON = your rule signals long; entry price + "
+        "unrealized return shown. ⏸ OFF = rule is quiet. Trigger detail "
+        "after each rule (Donchian = literal trigger price; MA/MACD = "
+        "current indicator gap; ATR-trail when ON = trailing stop level) "
+        "is mechanical from your rules — not a buy call. 🧠 Analyst is "
+        "sell-side aggregate. Bull/Bear is your own text in watchlist.json.</i>"
     )
     return "\n".join(lines)
 

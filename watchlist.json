@@ -1,6 +1,6 @@
 {
   "_comment": "Watchlist for strategy-based signal monitoring. Tickers, strategies, and theses are yours to edit. The 'thesis' values are STARTER drafts of common market talking points — review and rewrite to your own view. State persists across runs in watchlist_state.json so flips can be flagged.",
-  "tickers": ["IONQ", "ONDS", "VRT", "GENB"],
+  "tickers": ["IONQ", "ONDS", "VRT", "GENB", "NOK"],
   "strategies": [
     "donchian_20_10",
     "sma_20_50",
@@ -25,6 +25,10 @@
     "GENB": {
       "bull": "Generative-biology platform (Chroma model) applied across antibodies, peptides, enzymes — multiple shots on goal; AI-native drug design positioning in a sector being repriced; pharma partnerships provide non-dilutive funding + external validation; IPO cash extends runway into pipeline readouts.",
       "bear": "Pre-commercial revenue, clinical risk on every program; crowded AI-bio field (Recursion, Insitro, Isomorphic, Schrödinger, AbCellera) — platform differentiation hard to prove until human data; high burn vs. revenue, secondaries likely if readouts slip; sector-beta (XBI) drives big swings independent of fundamentals; recent IPO → lockup-expiry overhang."
+    },
+    "NOK": {
+      "bull": "Network Infrastructure division (IP routing + optical) levered to AI-datacenter Ethernet/IP buildout; 5G network share-takes in India + emerging markets; restructuring under new CEO (Hotard) tightening cost structure; dividend payer with low β (~0.77) — defensive ballast vs the growth book; valuation discount to peers despite Nokia Bell Labs IP portfolio.",
+      "bear": "Cyclical telco-capex exposure with carrier spending still soft in NA/Europe; Ericsson + Huawei (where allowed) + Cisco/Arista compete across segments; EUR-reporting drag when USD strengthens; China revenue restrictions; mobile-network legacy in secular decline; gross-margin pressure from price competition; ADR has lagged operational fundamentals for years — execution risk on the AI-networking pivot."
     }
   }
 }
