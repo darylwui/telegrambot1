@@ -42,6 +42,18 @@ except Exception as _e:
     build_watchlist_section = None
     print(f"watchlist_signals unavailable: {_e}")
 
+try:
+    from diagnostics import build_diagnostics_section
+except Exception as _e:
+    build_diagnostics_section = None
+    print(f"diagnostics unavailable: {_e}")
+
+try:
+    from screener import build_screener_section
+except Exception as _e:
+    build_screener_section = None
+    print(f"screener unavailable: {_e}")
+
 BOT_TOKEN = os.environ.get("PORTFOLIO_BOT_TOKEN", "")
 CHAT_ID = os.environ.get("PORTFOLIO_CHAT_ID", "")
 BRIEF_REPO_TOKEN = os.environ.get("BRIEF_REPO_TOKEN", "")
@@ -689,7 +701,7 @@ def render_action_plan(scored_rows, prices):
     return "<b>📑 Auto Action Plan</b>\n" + "\n".join(actions)
 
 
-def build_message(portfolio, prices, snapshots, indicators, history_state, brief_lines, date_str, session_label):
+def build_message(portfolio, prices, snapshots, indicators, history_state, brief_lines, date_str, session_label, history=None):
     sgt = pytz.timezone("Asia/Singapore")
     now_sgt = datetime.datetime.now(sgt)
     weekday = now_sgt.strftime("%a")
@@ -829,6 +841,26 @@ def build_message(portfolio, prices, snapshots, indicators, history_state, brief
                 lines.append(watchlist_section)
         except Exception as e:
             print(f"watchlist section failed: {e}")
+
+    # ── Portfolio diagnostics (factual, not trim/exit calls) ──
+    if build_diagnostics_section is not None:
+        try:
+            diag_section = build_diagnostics_section(portfolio, prices, history)
+            if diag_section:
+                lines.append("")
+                lines.append(diag_section)
+        except Exception as e:
+            print(f"diagnostics section failed: {e}")
+
+    # ── Screener (user-defined screens, raw data only) ──
+    if build_screener_section is not None:
+        try:
+            screen_section = build_screener_section()
+            if screen_section:
+                lines.append("")
+                lines.append(screen_section)
+        except Exception as e:
+            print(f"screener section failed: {e}")
 
     lines.append("")
     lines.append("<i>⚠️ Not financial advice — your call, your risk.</i>")
@@ -970,7 +1002,7 @@ def main():
     state = load_state()
 
     # Build message before saving state, so streaks reflect prior state
-    msg = build_message(portfolio, prices, snapshots, indicators, state, brief_lines, date_str, session_label)
+    msg = build_message(portfolio, prices, snapshots, indicators, state, brief_lines, date_str, session_label, history=history)
 
     # Append today's snapshot AFTER building (don't pollute streaks with current)
     total_value = sum((p["shares"] * prices[p["ticker"]]) for p in portfolio["positions"] if prices.get(p["ticker"]))
