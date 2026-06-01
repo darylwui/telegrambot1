@@ -48,12 +48,6 @@ except Exception as _e:
     build_diagnostics_section = None
     print(f"diagnostics unavailable: {_e}")
 
-try:
-    from screener import build_screener_section
-except Exception as _e:
-    build_screener_section = None
-    print(f"screener unavailable: {_e}")
-
 BOT_TOKEN = os.environ.get("PORTFOLIO_BOT_TOKEN", "")
 CHAT_ID = os.environ.get("PORTFOLIO_CHAT_ID", "")
 BRIEF_REPO_TOKEN = os.environ.get("BRIEF_REPO_TOKEN", "")
@@ -851,16 +845,6 @@ def build_message(portfolio, prices, snapshots, indicators, history_state, brief
                 lines.append(diag_section)
         except Exception as e:
             print(f"diagnostics section failed: {e}")
-
-    # ── Screener (user-defined screens, raw data only) ──
-    if build_screener_section is not None:
-        try:
-            screen_section = build_screener_section()
-            if screen_section:
-                lines.append("")
-                lines.append(screen_section)
-        except Exception as e:
-            print(f"screener section failed: {e}")
 
     lines.append("")
     lines.append("<i>⚠️ Not financial advice — your call, your risk.</i>")
