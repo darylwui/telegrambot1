@@ -48,6 +48,12 @@ except Exception as _e:
     build_diagnostics_section = None
     print(f"diagnostics unavailable: {_e}")
 
+try:
+    from earnings_spotlight import build_earnings_spotlight_section
+except Exception as _e:
+    build_earnings_spotlight_section = None
+    print(f"earnings_spotlight unavailable: {_e}")
+
 BOT_TOKEN = os.environ.get("PORTFOLIO_BOT_TOKEN", "")
 CHAT_ID = os.environ.get("PORTFOLIO_CHAT_ID", "")
 BRIEF_REPO_TOKEN = os.environ.get("BRIEF_REPO_TOKEN", "")
@@ -769,6 +775,16 @@ def build_message(portfolio, prices, snapshots, indicators, history_state, brief
     if block:
         lines.append("")
         lines.append(block)
+
+    # ── Earnings Spotlight (broader S&P 100 awareness, factual cards) ──
+    if build_earnings_spotlight_section is not None:
+        try:
+            spotlight = build_earnings_spotlight_section()
+            if spotlight:
+                lines.append("")
+                lines.append(spotlight)
+        except Exception as e:
+            print(f"earnings spotlight section failed: {e}")
 
     # ── Cluster exposure ──
     block = render_cluster_exposure(breakdown)
