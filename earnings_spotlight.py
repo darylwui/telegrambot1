@@ -73,33 +73,40 @@ def _load_universe() -> list[str]:
 # PER-TICKER DATA FETCH
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _next_earnings_within_horizon(ticker_obj: yf.Ticker, horizon_days: int) -> Optional[dict]:
-    """Return basic next-earnings info if within horizon, else None."""
+def _quick_filter_from_info(info: dict, horizon_days: int) -> Optional[dict]:
+    """
+    Cheap filter using only the .info dict (no extra API calls). Checks
+    if the ticker has earnings within the horizon. Returns minimal payload
+    or None.
+    """
+    ts = info.get("earningsTimestamp") or info.get("earningsTimestampStart")
+    if not ts:
+        return None
+    try:
+        next_date = pd.Timestamp(int(ts), unit="s", tz="UTC")
+    except Exception:
+        return None
+    today_utc = pd.Timestamp.now(tz="UTC").normalize()
+    days_until = (next_date.normalize() - today_utc).days
+    if days_until < 0 or days_until > horizon_days:
+        return None
+    return {"next_date": next_date, "days_until": days_until}
+
+
+def _detail_earnings(ticker_obj: yf.Ticker) -> Optional[dict]:
+    """Expensive fetch — past performance stats. Only call for qualifying tickers."""
     try:
         ed = ticker_obj.get_earnings_dates(limit=10)
     except Exception:
         return None
     if ed is None or ed.empty:
         return None
-
     idx_tz = ed.index.tz
     now = pd.Timestamp.now(tz=idx_tz) if idx_tz else pd.Timestamp.now()
-    today_utc = pd.Timestamp.now(tz="UTC").normalize()
-
     future = ed[ed.index >= now].sort_index()
-    if future.empty:
-        return None
-    next_date = future.index[0]
-    days_until = (next_date.tz_convert("UTC").normalize() - today_utc).days
-    if days_until < 0 or days_until > horizon_days:
-        return None
-
-    return {
-        "next_date": next_date,
-        "days_until": days_until,
-        "eps_estimate_next": future.iloc[0].get("EPS Estimate"),
-        "past": ed[ed.index < now].dropna(subset=["Reported EPS"]).sort_index(ascending=False).head(4),
-    }
+    past = ed[ed.index < now].dropna(subset=["Reported EPS"]).sort_index(ascending=False).head(4)
+    eps_est_from_ed = future.iloc[0].get("EPS Estimate") if not future.empty else None
+    return {"past": past, "eps_estimate_from_ed": eps_est_from_ed}
 
 
 def _historical_moves(hist: pd.DataFrame, past_dates: list) -> list[float]:
@@ -174,11 +181,29 @@ def _dossier_for_ticker(tk: str) -> Optional[dict]:
     finally:
         yf_logger.setLevel(prev_level)
 
-    earnings = _next_earnings_within_horizon(t, HORIZON_DAYS)
-    if not earnings:
+    # Cheap filter first — no extra API calls beyond the .info we already have
+    quick = _quick_filter_from_info(info, HORIZON_DAYS)
+    if not quick:
         return None
 
-    past = earnings["past"]
+    # Qualifying — now do the expensive fetch for past performance
+    detail = _detail_earnings(t)
+    past = detail["past"] if detail else pd.DataFrame()
+    if past.empty or "Surprise(%)" not in past.columns:
+        past = pd.DataFrame(columns=["Surprise(%)", "Reported EPS"])
+
+    # Build the earnings dict in the shape the rest of the function expects
+    eps_estimate_next = (
+        (detail["eps_estimate_from_ed"] if detail else None)
+        or info.get("earningsEstimate")
+        or info.get("epsCurrentYear")
+    )
+    earnings = {
+        "next_date": quick["next_date"],
+        "days_until": quick["days_until"],
+        "eps_estimate_next": eps_estimate_next,
+        "past": past,
+    }
     beats = int((past["Surprise(%)"] > 0).sum()) if "Surprise(%)" in past.columns else 0
     misses = int((past["Surprise(%)"] < 0).sum()) if "Surprise(%)" in past.columns else 0
     ins = int((past["Surprise(%)"] == 0).sum()) if "Surprise(%)" in past.columns else 0
@@ -300,18 +325,25 @@ def build_earnings_spotlight_section() -> Optional[str]:
     """Top-level entry. Returns rendered HTML section or None if nothing qualifies."""
     universe = _load_universe()
     if not universe:
+        print("[spotlight] empty universe; section skipped")
         return None
 
+    print(f"[spotlight] scanning {len(universe)} tickers...")
     dossiers: list[dict] = []
+    errors = 0
     for tk in universe:
         try:
             d = _dossier_for_ticker(tk)
             if d:
                 dossiers.append(d)
         except Exception as e:
-            print(f"[spotlight] {tk}: {e}")
+            errors += 1
+            if errors <= 3:  # Don't flood the log; first 3 errors only
+                print(f"[spotlight] {tk}: {type(e).__name__}: {str(e)[:80]}")
             continue
 
+    print(f"[spotlight] {len(dossiers)} qualified for next {HORIZON_DAYS}d window "
+          f"(scanned {len(universe)}, errors {errors})")
     if not dossiers:
         return None
 
