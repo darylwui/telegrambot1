@@ -116,7 +116,8 @@ def _cache_records_to_df(records: list) -> tuple[pd.DataFrame, list]:
     """Decode cached records into a (past_df, announcement_dates) tuple."""
     if not records:
         return pd.DataFrame(columns=["Reported EPS", "Surprise(%)"]), []
-    dates = pd.to_datetime([r["date"] for r in records])
+    # utc=True normalizes mixed offsets (-05:00 / -04:00 from DST) cleanly
+    dates = pd.to_datetime([r["date"] for r in records], utc=True)
     df = pd.DataFrame({
         "Reported EPS": [r["reported_eps"] for r in records],
         "Surprise(%)": [r["surprise_pct"] for r in records],
