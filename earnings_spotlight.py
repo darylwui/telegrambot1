@@ -93,20 +93,68 @@ def _quick_filter_from_info(info: dict, horizon_days: int) -> Optional[dict]:
     return {"next_date": next_date, "days_until": days_until}
 
 
-def _detail_earnings(ticker_obj: yf.Ticker) -> Optional[dict]:
-    """Expensive fetch — past performance stats. Only call for qualifying tickers."""
+def _past_performance(ticker_obj: yf.Ticker) -> dict:
+    """
+    Return {
+      'past_df': DataFrame with ['Reported EPS', 'Surprise(%)'],
+      'announcement_dates': list of past actual announcement dates OR None
+                           when the source only provides fiscal-period-end dates
+                           (in which case we cannot compute earnings-day moves).
+    }
+
+    Strategy:
+      1) Try get_earnings_dates first — has real announcement dates, enabling
+         the historical earnings-day move calculation.
+      2) Fall back to earnings_history — stable but indexed by fiscal period
+         end, not announcement date. We use it for beat/miss stats only and
+         flag announcement_dates as None so the move calc is skipped.
+    """
+    # Path 1: get_earnings_dates — real announcement dates
     try:
         ed = ticker_obj.get_earnings_dates(limit=10)
+        if ed is not None and not ed.empty:
+            idx_tz = ed.index.tz
+            now = pd.Timestamp.now(tz=idx_tz) if idx_tz else pd.Timestamp.now()
+            past = ed[ed.index < now].dropna(subset=["Reported EPS"]).sort_index(ascending=False).head(4)
+            if not past.empty and "Surprise(%)" in past.columns:
+                return {
+                    "past_df": past[["Reported EPS", "Surprise(%)"]],
+                    "announcement_dates": list(past.index),
+                }
     except Exception:
-        return None
-    if ed is None or ed.empty:
-        return None
-    idx_tz = ed.index.tz
-    now = pd.Timestamp.now(tz=idx_tz) if idx_tz else pd.Timestamp.now()
-    future = ed[ed.index >= now].sort_index()
-    past = ed[ed.index < now].dropna(subset=["Reported EPS"]).sort_index(ascending=False).head(4)
-    eps_est_from_ed = future.iloc[0].get("EPS Estimate") if not future.empty else None
-    return {"past": past, "eps_estimate_from_ed": eps_est_from_ed}
+        pass
+
+    # Path 2: earnings_history — beat/miss only, no announcement dates
+    try:
+        eh = ticker_obj.earnings_history
+        if eh is not None and not eh.empty:
+            df = eh.sort_index(ascending=False).head(4).copy()
+            rep_col = next((c for c in ["epsActual", "Reported EPS"] if c in df.columns), None)
+            sur_col = next((c for c in ["surprisePercent", "Surprise(%)"] if c in df.columns), None)
+            if rep_col and sur_col:
+                out = pd.DataFrame({
+                    "Reported EPS": df[rep_col],
+                    "Surprise(%)": df[sur_col],
+                }, index=df.index).dropna(subset=["Reported EPS"])
+                if not out.empty:
+                    return {"past_df": out, "announcement_dates": None}
+    except Exception:
+        pass
+
+    return {"past_df": pd.DataFrame(columns=["Reported EPS", "Surprise(%)"]),
+            "announcement_dates": None}
+
+
+def _next_quarter_eps_estimate(ticker_obj: yf.Ticker) -> Optional[float]:
+    """Quarterly EPS consensus for the upcoming report. Uses earnings_estimate DF."""
+    try:
+        est = ticker_obj.earnings_estimate
+        if est is not None and not est.empty and "0q" in est.index:
+            v = est.loc["0q", "avg"]
+            return float(v) if pd.notna(v) else None
+    except Exception:
+        pass
+    return None
 
 
 def _historical_moves(hist: pd.DataFrame, past_dates: list) -> list[float]:
@@ -186,34 +234,36 @@ def _dossier_for_ticker(tk: str) -> Optional[dict]:
     if not quick:
         return None
 
-    # Qualifying — now do the expensive fetch for past performance
-    detail = _detail_earnings(t)
-    past = detail["past"] if detail else pd.DataFrame()
-    if past.empty or "Surprise(%)" not in past.columns:
-        past = pd.DataFrame(columns=["Surprise(%)", "Reported EPS"])
+    # Qualifying — fetch past performance + quarterly EPS estimate from stable DFs
+    perf = _past_performance(t)
+    past = perf["past_df"]
+    announcement_dates = perf["announcement_dates"]
+    eps_estimate_next = _next_quarter_eps_estimate(t)
 
-    # Build the earnings dict in the shape the rest of the function expects
-    eps_estimate_next = (
-        (detail["eps_estimate_from_ed"] if detail else None)
-        or info.get("earningsEstimate")
-        or info.get("epsCurrentYear")
-    )
     earnings = {
         "next_date": quick["next_date"],
         "days_until": quick["days_until"],
         "eps_estimate_next": eps_estimate_next,
         "past": past,
+        "announcement_dates": announcement_dates,
     }
     beats = int((past["Surprise(%)"] > 0).sum()) if "Surprise(%)" in past.columns else 0
     misses = int((past["Surprise(%)"] < 0).sum()) if "Surprise(%)" in past.columns else 0
     ins = int((past["Surprise(%)"] == 0).sum()) if "Surprise(%)" in past.columns else 0
 
-    try:
-        hist = t.history(period="3y", auto_adjust=True)
-    except Exception:
-        hist = pd.DataFrame()
-    moves = _historical_moves(hist, list(past.index[:4]))
-    avg_abs_move = (sum(abs(m) for m in moves) / len(moves)) if moves else None
+    # Only compute earnings-day moves when we have ACTUAL announcement dates
+    # (Path 1 of _past_performance). If we only have fiscal-period-end dates
+    # (Path 2 fallback), the move calculation would measure unrelated price
+    # action — so skip it rather than report wrong numbers.
+    moves: list[float] = []
+    avg_abs_move = None
+    if announcement_dates:
+        try:
+            hist = t.history(period="3y", auto_adjust=True)
+        except Exception:
+            hist = pd.DataFrame()
+        moves = _historical_moves(hist, list(announcement_dates[:4]))
+        avg_abs_move = (sum(abs(m) for m in moves) / len(moves)) if moves else None
 
     # Earnings call timing — BMO vs AMC heuristic from the timestamp hour
     next_dt = earnings["next_date"]
