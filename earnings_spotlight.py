@@ -35,6 +35,7 @@ MIN_MARKET_CAP = 10_000_000_000  # $10B
 PORTFOLIO_FILE = "portfolio.json"
 WATCHLIST_FILE = "watchlist.json"
 SPX100_FILE = "spx100.json"
+CACHE_FILE = "earnings_cache.json"
 
 # Revision-momentum thresholds, mechanical from data
 REVISION_BULLISH_THRESHOLD = 0.02   # current consensus > 30d-ago by 2%+
@@ -93,7 +94,49 @@ def _quick_filter_from_info(info: dict, horizon_days: int) -> Optional[dict]:
     return {"next_date": next_date, "days_until": days_until}
 
 
-def _past_performance(ticker_obj: yf.Ticker) -> dict:
+def _load_cache() -> dict:
+    if not os.path.exists(CACHE_FILE):
+        return {}
+    try:
+        with open(CACHE_FILE) as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _save_cache(cache: dict) -> None:
+    try:
+        with open(CACHE_FILE, "w") as f:
+            json.dump(cache, f, indent=2, default=str)
+    except Exception as e:
+        print(f"[spotlight] cache save failed: {e}")
+
+
+def _cache_records_to_df(records: list) -> tuple[pd.DataFrame, list]:
+    """Decode cached records into a (past_df, announcement_dates) tuple."""
+    if not records:
+        return pd.DataFrame(columns=["Reported EPS", "Surprise(%)"]), []
+    dates = pd.to_datetime([r["date"] for r in records])
+    df = pd.DataFrame({
+        "Reported EPS": [r["reported_eps"] for r in records],
+        "Surprise(%)": [r["surprise_pct"] for r in records],
+    }, index=dates)
+    return df, list(dates)
+
+
+def _df_to_cache_records(df: pd.DataFrame) -> list:
+    return [
+        {
+            "date": idx.isoformat(),
+            "reported_eps": float(row["Reported EPS"]),
+            "surprise_pct": float(row["Surprise(%)"]),
+        }
+        for idx, row in df.iterrows()
+        if pd.notna(row["Reported EPS"]) and pd.notna(row["Surprise(%)"])
+    ]
+
+
+def _past_performance(ticker_obj: yf.Ticker, ticker: str, cache: dict) -> dict:
     """
     Return {
       'past_df': DataFrame with ['Reported EPS', 'Surprise(%)'],
@@ -109,7 +152,7 @@ def _past_performance(ticker_obj: yf.Ticker) -> dict:
          end, not announcement date. We use it for beat/miss stats only and
          flag announcement_dates as None so the move calc is skipped.
     """
-    # Path 1: get_earnings_dates — real announcement dates
+    # Path 1: get_earnings_dates — real announcement dates. Updates cache on success.
     try:
         ed = ticker_obj.get_earnings_dates(limit=10)
         if ed is not None and not ed.empty:
@@ -117,14 +160,22 @@ def _past_performance(ticker_obj: yf.Ticker) -> dict:
             now = pd.Timestamp.now(tz=idx_tz) if idx_tz else pd.Timestamp.now()
             past = ed[ed.index < now].dropna(subset=["Reported EPS"]).sort_index(ascending=False).head(4)
             if not past.empty and "Surprise(%)" in past.columns:
+                past_df = past[["Reported EPS", "Surprise(%)"]]
+                cache[ticker] = _df_to_cache_records(past_df)
                 return {
-                    "past_df": past[["Reported EPS", "Surprise(%)"]],
-                    "announcement_dates": list(past.index),
+                    "past_df": past_df,
+                    "announcement_dates": list(past_df.index),
                 }
     except Exception:
         pass
 
-    # Path 2: earnings_history — beat/miss only, no announcement dates
+    # Path 2: cache — built up from past successful runs. Has real announcement dates.
+    if ticker in cache and cache[ticker]:
+        df, dates = _cache_records_to_df(cache[ticker])
+        if not df.empty:
+            return {"past_df": df, "announcement_dates": dates}
+
+    # Path 3: earnings_history — beat/miss only, no announcement dates
     try:
         eh = ticker_obj.earnings_history
         if eh is not None and not eh.empty:
@@ -210,7 +261,7 @@ def _revision_label(ticker_obj: yf.Ticker) -> tuple[Optional[str], Optional[floa
         return (None, None)
 
 
-def _dossier_for_ticker(tk: str) -> Optional[dict]:
+def _dossier_for_ticker(tk: str, cache: dict) -> Optional[dict]:
     """Build the full dossier dict for one ticker, or None if it doesn't qualify."""
     import logging
     # yfinance logs 404s for delisted/renamed tickers — suppress to keep output clean
@@ -235,7 +286,7 @@ def _dossier_for_ticker(tk: str) -> Optional[dict]:
         return None
 
     # Qualifying — fetch past performance + quarterly EPS estimate from stable DFs
-    perf = _past_performance(t)
+    perf = _past_performance(t, tk, cache)
     past = perf["past_df"]
     announcement_dates = perf["announcement_dates"]
     eps_estimate_next = _next_quarter_eps_estimate(t)
@@ -378,12 +429,15 @@ def build_earnings_spotlight_section() -> Optional[str]:
         print("[spotlight] empty universe; section skipped")
         return None
 
-    print(f"[spotlight] scanning {len(universe)} tickers...")
+    cache = _load_cache()
+    cache_size_before = sum(1 for v in cache.values() if v)
+
+    print(f"[spotlight] scanning {len(universe)} tickers (cache: {cache_size_before} entries)...")
     dossiers: list[dict] = []
     errors = 0
     for tk in universe:
         try:
-            d = _dossier_for_ticker(tk)
+            d = _dossier_for_ticker(tk, cache)
             if d:
                 dossiers.append(d)
         except Exception as e:
@@ -391,6 +445,11 @@ def build_earnings_spotlight_section() -> Optional[str]:
             if errors <= 3:  # Don't flood the log; first 3 errors only
                 print(f"[spotlight] {tk}: {type(e).__name__}: {str(e)[:80]}")
             continue
+
+    cache_size_after = sum(1 for v in cache.values() if v)
+    if cache_size_after != cache_size_before:
+        _save_cache(cache)
+        print(f"[spotlight] cache updated: {cache_size_before} → {cache_size_after} entries")
 
     print(f"[spotlight] {len(dossiers)} qualified for next {HORIZON_DAYS}d window "
           f"(scanned {len(universe)}, errors {errors})")
