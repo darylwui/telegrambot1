@@ -816,15 +816,21 @@ def build_message(portfolio, prices, snapshots, indicators, history_state, brief
             if playbook:
                 lines.append(playbook)
 
-    # ── Macro ──
-    lines.append("")
-    lines.append(render_macro())
-
-    # ── Action plan ──
+    # ── Action plan (summary of position breakdown — keep adjacent) ──
     plan = render_action_plan(scored, prices)
     if plan:
         lines.append("")
         lines.append(plan)
+
+    # ── Portfolio diagnostics (factual, not trim/exit calls) ──
+    if build_diagnostics_section is not None:
+        try:
+            diag_section = build_diagnostics_section(portfolio, prices, history)
+            if diag_section:
+                lines.append("")
+                lines.append(diag_section)
+        except Exception as e:
+            print(f"diagnostics section failed: {e}")
 
     # ── Strategy watchlist (rule-state only, separate from portfolio) ──
     if build_watchlist_section is not None:
@@ -836,15 +842,9 @@ def build_message(portfolio, prices, snapshots, indicators, history_state, brief
         except Exception as e:
             print(f"watchlist section failed: {e}")
 
-    # ── Portfolio diagnostics (factual, not trim/exit calls) ──
-    if build_diagnostics_section is not None:
-        try:
-            diag_section = build_diagnostics_section(portfolio, prices, history)
-            if diag_section:
-                lines.append("")
-                lines.append(diag_section)
-        except Exception as e:
-            print(f"diagnostics section failed: {e}")
+    # ── Macro (reference context — at the tail, not wedged in action area) ──
+    lines.append("")
+    lines.append(render_macro())
 
     lines.append("")
     lines.append("<i>⚠️ Not financial advice — your call, your risk.</i>")
