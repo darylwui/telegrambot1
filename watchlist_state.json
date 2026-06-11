@@ -1,56 +1,56 @@
 {
   "tickers": {
     "IONQ": {
-      "as_of": "2026-06-10",
-      "close": 57.71,
-      "atr14": 5.917,
-      "rsi14": 49.8,
+      "as_of": "2026-06-09",
+      "close": 56.69,
+      "atr14": 6.046,
+      "rsi14": 48.7,
       "strategies": {
         "donchian_20_10": {
           "state": "LONG",
           "last_flip_date": "2026-04-14",
           "entry_price_if_long": 38.36,
-          "unrealized_pct": 50.44,
-          "trigger_detail": "exit \u2193 $53.26 (-7.7%)"
+          "unrealized_pct": 47.78,
+          "trigger_detail": "exit \u2193 $55.84 (-1.5%)"
         },
         "sma_20_50": {
           "state": "LONG",
           "last_flip_date": "2026-04-22",
           "entry_price_if_long": 46.61,
-          "unrealized_pct": 23.81,
-          "trigger_detail": "SMA20 $60.86 \u00b7 SMA50 $49.02 \u00b7 gap +24.2%"
+          "unrealized_pct": 21.63,
+          "trigger_detail": "SMA20 $60.77 \u00b7 SMA50 $48.40 \u00b7 gap +25.6%"
         },
         "trend_filter": {
           "state": "LONG",
           "last_flip_date": "2026-05-05",
           "entry_price_if_long": 49.1,
-          "unrealized_pct": 17.54,
-          "trigger_detail": "SMA20/50/200 $60.86/$49.02/$48.82 \u00b7 regime \u2713 above 200"
+          "unrealized_pct": 15.46,
+          "trigger_detail": "SMA20/50/200 $60.77/$48.40/$48.73 \u00b7 regime \u2713 above 200"
         },
         "macd": {
           "state": "FLAT",
           "last_flip_date": "2026-06-05",
           "entry_price_if_long": null,
           "unrealized_pct": null,
-          "trigger_detail": "MACD +3.366 \u00b7 signal +4.992 \u00b7 gap -1.626"
+          "trigger_detail": "MACD +4.028 \u00b7 signal +5.398 \u00b7 gap -1.370"
         },
         "atr_trail": {
           "state": "LONG",
           "last_flip_date": "2026-04-22",
           "entry_price_if_long": 46.61,
-          "unrealized_pct": 23.81,
-          "trigger_detail": "HWM $72.07 \u00b7 trailing stop $54.32 (-5.9%)"
+          "unrealized_pct": 21.63,
+          "trigger_detail": "HWM $72.07 \u00b7 trailing stop $53.93 (-4.9%)"
         }
       },
       "fundamentals": {
-        "market_cap": 21541408768,
+        "market_cap": 21138278400,
         "fifty_two_high": 84.64,
         "fifty_two_low": 25.89,
         "beta": 3.184,
         "revenue_ttm": 187118000,
         "cash": 2033469952,
         "debt": 30443000,
-        "ps_ratio": 115.122055,
+        "ps_ratio": 112.967636,
         "short_pct_float": 0.15609999,
         "rec_key": "strong_buy",
         "rec_label": "Strong Buy",
@@ -61,56 +61,56 @@
       }
     },
     "ONDS": {
-      "as_of": "2026-06-10",
-      "close": 9.47,
-      "atr14": 1.155,
-      "rsi14": 43.0,
+      "as_of": "2026-06-09",
+      "close": 9.65,
+      "atr14": 1.193,
+      "rsi14": 43.9,
       "strategies": {
         "donchian_20_10": {
           "state": "LONG",
           "last_flip_date": "2026-05-28",
           "entry_price_if_long": 12.75,
-          "unrealized_pct": -25.73,
-          "trigger_detail": "exit \u2193 $9.04 (-4.5%)"
+          "unrealized_pct": -24.31,
+          "trigger_detail": "exit \u2193 $9.31 (-3.5%)"
         },
         "sma_20_50": {
           "state": "LONG",
           "last_flip_date": "2026-05-29",
           "entry_price_if_long": 13.245,
-          "unrealized_pct": -28.5,
-          "trigger_detail": "SMA20 $10.73 \u00b7 SMA50 $10.16 \u00b7 gap +5.7%"
+          "unrealized_pct": -27.14,
+          "trigger_detail": "SMA20 $10.71 \u00b7 SMA50 $10.13 \u00b7 gap +5.7%"
         },
         "trend_filter": {
           "state": "LONG",
           "last_flip_date": "2026-05-29",
           "entry_price_if_long": 13.245,
-          "unrealized_pct": -28.5,
-          "trigger_detail": "SMA20/50/200 $10.73/$10.16/$9.20 \u00b7 regime \u2713 above 200"
+          "unrealized_pct": -27.14,
+          "trigger_detail": "SMA20/50/200 $10.71/$10.13/$9.17 \u00b7 regime \u2713 above 200"
         },
         "macd": {
           "state": "FLAT",
           "last_flip_date": "2026-06-08",
           "entry_price_if_long": null,
           "unrealized_pct": null,
-          "trigger_detail": "MACD +0.143 \u00b7 signal +0.382 \u00b7 gap -0.239"
+          "trigger_detail": "MACD +0.287 \u00b7 signal +0.442 \u00b7 gap -0.155"
         },
         "atr_trail": {
-          "state": "LONG",
-          "last_flip_date": "2026-06-10",
-          "entry_price_if_long": 9.665,
-          "unrealized_pct": -2.02,
-          "trigger_detail": "HWM $9.47 \u00b7 trailing stop $6.01 (-36.6%)"
+          "state": "FLAT",
+          "last_flip_date": "2026-06-09",
+          "entry_price_if_long": null,
+          "unrealized_pct": null,
+          "trigger_detail": "SMA20 $10.71 \u00b7 SMA50 $10.13 \u00b7 gap +5.7%"
         }
       },
       "fundamentals": {
-        "market_cap": 4829574656,
+        "market_cap": 4815109120,
         "fifty_two_high": 15.28,
         "fifty_two_low": 1.36,
         "beta": 2.622,
         "revenue_ttm": 96605000,
         "cash": 1473844992,
         "debt": 7865000,
-        "ps_ratio": 49.993008,
+        "ps_ratio": 49.84327,
         "short_pct_float": 0.3196,
         "rec_key": "strong_buy",
         "rec_label": "Strong Buy",
@@ -121,56 +121,56 @@
       }
     },
     "VRT": {
-      "as_of": "2026-06-10",
-      "close": 277.72,
-      "atr14": 18.957,
-      "rsi14": 32.7,
+      "as_of": "2026-06-09",
+      "close": 289.52,
+      "atr14": 19.07,
+      "rsi14": 36.2,
       "strategies": {
         "donchian_20_10": {
           "state": "FLAT",
           "last_flip_date": "2026-05-19",
           "entry_price_if_long": null,
           "unrealized_pct": null,
-          "trigger_detail": "trigger \u2191 $379.93 (+36.8%)"
+          "trigger_detail": "trigger \u2191 $379.93 (+31.2%)"
         },
         "sma_20_50": {
           "state": "LONG",
           "last_flip_date": "2026-01-23",
           "entry_price_if_long": 180.9769,
-          "unrealized_pct": 53.46,
-          "trigger_detail": "SMA20 $325.06 \u00b7 SMA50 $315.68 \u00b7 gap +3.0%"
+          "unrealized_pct": 59.98,
+          "trigger_detail": "SMA20 $329.53 \u00b7 SMA50 $314.81 \u00b7 gap +4.7%"
         },
         "trend_filter": {
           "state": "LONG",
           "last_flip_date": "2026-01-23",
           "entry_price_if_long": 180.9769,
-          "unrealized_pct": 53.46,
-          "trigger_detail": "SMA20/50/200 $325.06/$315.68/$218.40 \u00b7 regime \u2713 above 200"
+          "unrealized_pct": 59.98,
+          "trigger_detail": "SMA20/50/200 $329.53/$314.81/$217.64 \u00b7 regime \u2713 above 200"
         },
         "macd": {
           "state": "FLAT",
           "last_flip_date": "2026-05-18",
           "entry_price_if_long": null,
           "unrealized_pct": null,
-          "trigger_detail": "MACD -7.639 \u00b7 signal -1.053 \u00b7 gap -6.586"
+          "trigger_detail": "MACD -4.998 \u00b7 signal +0.594 \u00b7 gap -5.591"
         },
         "atr_trail": {
           "state": "LONG",
           "last_flip_date": "2026-05-21",
           "entry_price_if_long": 333.96,
-          "unrealized_pct": -16.84,
-          "trigger_detail": "HWM $334.49 \u00b7 trailing stop $277.62 (-0.0%)"
+          "unrealized_pct": -13.31,
+          "trigger_detail": "HWM $334.49 \u00b7 trailing stop $277.28 (-4.2%)"
         }
       },
       "fundamentals": {
-        "market_cap": 106674192384,
+        "market_cap": 107926896640,
         "fifty_two_high": 379.935,
-        "fifty_two_low": 107.38,
+        "fifty_two_low": 108.81,
         "beta": 2.037,
         "revenue_ttm": 10843400192,
         "cash": 2500499968,
         "debt": 3264900096,
-        "ps_ratio": 9.837707,
+        "ps_ratio": 9.953234,
         "short_pct_float": 0.0373,
         "rec_key": "strong_buy",
         "rec_label": "Strong Buy",
@@ -181,24 +181,24 @@
       }
     },
     "GENB": {
-      "as_of": "2026-06-10",
-      "close": 13.12,
-      "atr14": 1.202,
-      "rsi14": 48.5,
+      "as_of": "2026-06-09",
+      "close": 13.19,
+      "atr14": 1.229,
+      "rsi14": 48.8,
       "strategies": {
         "donchian_20_10": {
           "state": "FLAT",
           "last_flip_date": "2026-05-19",
           "entry_price_if_long": null,
           "unrealized_pct": null,
-          "trigger_detail": "trigger \u2191 $16.75 (+27.7%)"
+          "trigger_detail": "trigger \u2191 $16.75 (+27.0%)"
         },
         "sma_20_50": {
           "state": "LONG",
           "last_flip_date": "2026-05-08",
           "entry_price_if_long": 13.65,
-          "unrealized_pct": -3.88,
-          "trigger_detail": "SMA20 $13.59 \u00b7 SMA50 $13.25 \u00b7 gap +2.6%"
+          "unrealized_pct": -3.37,
+          "trigger_detail": "SMA20 $13.71 \u00b7 SMA50 $13.21 \u00b7 gap +3.7%"
         },
         "trend_filter": {
           "state": "FLAT",
@@ -212,25 +212,25 @@
           "last_flip_date": "2026-05-19",
           "entry_price_if_long": null,
           "unrealized_pct": null,
-          "trigger_detail": "MACD -0.127 \u00b7 signal -0.057 \u00b7 gap -0.070"
+          "trigger_detail": "MACD -0.125 \u00b7 signal -0.039 \u00b7 gap -0.086"
         },
         "atr_trail": {
           "state": "LONG",
           "last_flip_date": "2026-06-03",
           "entry_price_if_long": 12.91,
-          "unrealized_pct": 1.63,
-          "trigger_detail": "HWM $14.70 \u00b7 trailing stop $11.09 (-15.4%)"
+          "unrealized_pct": 2.17,
+          "trigger_detail": "HWM $14.70 \u00b7 trailing stop $11.01 (-16.5%)"
         }
       },
       "fundamentals": {
-        "market_cap": 1681885312,
+        "market_cap": 1687012992,
         "fifty_two_high": 16.75,
         "fifty_two_low": 11.0,
         "beta": null,
         "revenue_ttm": 30299000,
         "cash": 516640992,
         "debt": 65570000,
-        "ps_ratio": 55.509598,
+        "ps_ratio": 55.678833,
         "short_pct_float": 0.0548,
         "rec_key": "none",
         "rec_label": "None",
@@ -241,56 +241,56 @@
       }
     },
     "NOK": {
-      "as_of": "2026-06-10",
-      "close": 13.5,
-      "atr14": 1.033,
-      "rsi14": 45.6,
+      "as_of": "2026-06-09",
+      "close": 13.85,
+      "atr14": 1.069,
+      "rsi14": 47.6,
       "strategies": {
         "donchian_20_10": {
           "state": "FLAT",
           "last_flip_date": "2026-06-09",
           "entry_price_if_long": null,
           "unrealized_pct": null,
-          "trigger_detail": "trigger \u2191 $17.45 (+29.3%)"
+          "trigger_detail": "trigger \u2191 $17.45 (+26.0%)"
         },
         "sma_20_50": {
           "state": "LONG",
           "last_flip_date": "2026-01-12",
           "entry_price_if_long": 6.56,
-          "unrealized_pct": 105.79,
-          "trigger_detail": "SMA20 $14.94 \u00b7 SMA50 $12.52 \u00b7 gap +19.4%"
+          "unrealized_pct": 111.13,
+          "trigger_detail": "SMA20 $14.93 \u00b7 SMA50 $12.41 \u00b7 gap +20.3%"
         },
         "trend_filter": {
           "state": "LONG",
           "last_flip_date": "2026-01-12",
           "entry_price_if_long": 6.56,
-          "unrealized_pct": 105.79,
-          "trigger_detail": "SMA20/50/200 $14.94/$12.52/$7.91 \u00b7 regime \u2713 above 200"
+          "unrealized_pct": 111.13,
+          "trigger_detail": "SMA20/50/200 $14.93/$12.41/$7.86 \u00b7 regime \u2713 above 200"
         },
         "macd": {
           "state": "FLAT",
           "last_flip_date": "2026-06-05",
           "entry_price_if_long": null,
           "unrealized_pct": null,
-          "trigger_detail": "MACD +0.577 \u00b7 signal +0.964 \u00b7 gap -0.388"
+          "trigger_detail": "MACD +0.758 \u00b7 signal +1.061 \u00b7 gap -0.303"
         },
         "atr_trail": {
-          "state": "FLAT",
-          "last_flip_date": "2026-06-10",
-          "entry_price_if_long": null,
-          "unrealized_pct": null,
-          "trigger_detail": "SMA20 $14.94 \u00b7 SMA50 $12.52 \u00b7 gap +19.4%"
+          "state": "LONG",
+          "last_flip_date": "2026-01-12",
+          "entry_price_if_long": 6.56,
+          "unrealized_pct": 111.13,
+          "trigger_detail": "HWM $16.85 \u00b7 trailing stop $13.64 (-1.5%)"
         }
       },
       "fundamentals": {
-        "market_cap": 75364212736,
+        "market_cap": 74805952512,
         "fifty_two_high": 17.45,
         "fifty_two_low": 4.0,
         "beta": 0.781,
         "revenue_ttm": 19996000256,
         "cash": 5830000128,
         "debt": 3324999936,
-        "ps_ratio": 3.7689643,
+        "ps_ratio": 3.7410457,
         "short_pct_float": 0.0119,
         "rec_key": "buy",
         "rec_label": "Buy",
