@@ -34,7 +34,6 @@ import requests
 import yfinance as yf
 
 from clusters import CLUSTERS, SINGLE_NAME_THRESHOLD, CLUSTER_THRESHOLD, classify
-from macro_config import MACRO
 
 try:
     from watchlist_signals import build_watchlist_section
@@ -662,16 +661,6 @@ def render_position_block(tkr, sh, c, px, pnl, pct, ind, snap, brief_line, strea
     return "\n".join(lines)
 
 
-def render_macro():
-    lines = ["<b>🌐 Macro Outlook</b>", "<b>Key risks</b>"]
-    for r in MACRO["risks"]:
-        lines.append(f"  ⚠️ {r}")
-    lines.append("<b>Watch</b>")
-    for w in MACRO["watch"]:
-        lines.append(f"  📌 {w}")
-    return "\n".join(lines)
-
-
 def render_action_plan(scored_rows, prices):
     """Concrete share-count actions for Trim / Buy positions."""
     actions = []
@@ -857,10 +846,6 @@ def build_message(portfolio, prices, snapshots, indicators, history_state, brief
                 lines.append(watchlist_section)
         except Exception as e:
             print(f"watchlist section failed: {e}")
-
-    # ── Macro (reference context — at the tail, not wedged in action area) ──
-    lines.append("")
-    lines.append(render_macro())
 
     lines.append("")
     lines.append("<i>⚠️ Not financial advice — your call, your risk.</i>")
