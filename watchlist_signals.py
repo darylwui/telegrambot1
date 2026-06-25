@@ -385,11 +385,67 @@ def _evaluate_one(df: pd.DataFrame, sname: str) -> dict:
     }
 
 
+def _compute_levels(close: float, sma20, sma50, sma200, high52: float, atr: float, analyst_target) -> dict:
+    """Derive entry zone, stop, and take-profit from price indicators."""
+    rsi_placeholder = 50  # RSI already shown separately; not used for screen here
+    screen = el = eh = st = None
+
+    if sma200 and close > sma200 and sma50 and abs(close / sma50 - 1) <= 0.05:
+        # Use RSI from caller context isn't available here — default to uptrend cooling
+        pass  # fall through to uptrend_cooling below if SMA stack looks right
+
+    if sma200 and sma20 and sma50 and sma20 > sma50 > sma200 and close > sma20:
+        screen = "momentum"
+        el, eh = sma20 * 0.99, sma20 * 1.015
+        st = sma50 * 0.98
+    elif close >= high52 * 0.99:
+        screen = "breakout"
+        el, eh = high52 * 0.99, high52 * 1.01
+        st = high52 * 0.95
+    elif sma200 and close > sma200 and sma50:
+        screen = "uptrend cooling"
+        el, eh = sma50 * 0.99, sma50 * 1.01
+        st = sma200 * 0.98
+    else:
+        screen = "no clean setup"
+        el, eh = close - 0.5 * atr, close + 0.5 * atr
+        st = close - 1.5 * atr
+
+    entry_mid = (el + eh) / 2
+    risk = abs(entry_mid - st)
+
+    tp = tp_source = None
+    if analyst_target and float(analyst_target) > eh:
+        tp = round(float(analyst_target), 2)
+        tp_source = "analyst PT"
+    elif risk > 0:
+        tp = round(entry_mid + 2 * risk, 2)
+        tp_source = "2R"
+
+    upside = round((tp / close - 1) * 100, 1) if tp else None
+
+    return {
+        "screen":      screen,
+        "entry_low":   round(el, 2),
+        "entry_high":  round(eh, 2),
+        "stop":        round(st, 2),
+        "tp":          tp,
+        "tp_source":   tp_source,
+        "upside":      upside,
+    }
+
+
 def _evaluate_ticker(ticker: str, df: pd.DataFrame, strategies: list[str]) -> dict:
     last = df.iloc[-1]
     close = float(last["Close"])
     atr_v = float(_atr(df, 14).iloc[-1])
     rsi_v = float(_rsi(df["Close"], 14).iloc[-1])
+
+    cl = df["Close"]
+    sma20  = round(float(_sma(cl, 20).iloc[-1]),  2) if len(cl) >= 20 else None
+    sma50  = round(float(_sma(cl, 50).iloc[-1]),  2) if len(cl) >= 50 else None
+    sma200 = round(float(_sma(cl, 200).iloc[-1]), 2) if len(cl) >= 200 else None
+    high52 = round(float(cl.tail(252).max()), 2)
 
     strat_state = {}
     for s in strategies:
@@ -400,13 +456,19 @@ def _evaluate_ticker(ticker: str, df: pd.DataFrame, strategies: list[str]) -> di
         except Exception as e:
             print(f"[watchlist] strategy {s} failed for {ticker}: {e}")
 
+    fundamentals = _fetch_fundamentals(ticker)
+    levels = _compute_levels(close, sma20, sma50, sma200, high52, atr_v,
+                             fundamentals.get("target_mean"))
+
     return {
         "as_of": df.index[-1].strftime("%Y-%m-%d"),
         "close": round(close, 2),
         "atr14": round(atr_v, 3),
         "rsi14": round(rsi_v, 1),
+        "sma20": sma20, "sma50": sma50, "sma200": sma200, "high52w": high52,
+        "levels": levels,
         "strategies": strat_state,
-        "fundamentals": _fetch_fundamentals(ticker),
+        "fundamentals": fundamentals,
     }
 
 
@@ -531,6 +593,17 @@ def _render(report: dict, flips: list[str], thesis_cfg: dict) -> str:
             f"RSI {data['rsi14']:.0f} · ATR(14) {data['atr14']:.2f}"
         )
         lines.append(f"  {emoji} {summary}")
+
+        # Entry / stop / take-profit levels
+        lv = data.get("levels") or {}
+        if lv:
+            tp_str = f"  |  PT ${lv['tp']:.2f} ({lv['upside']:+.1f}%)" if lv.get("tp") else ""
+            lines.append(
+                f"  🎯 Entry ${lv['entry_low']:.2f}–${lv['entry_high']:.2f}"
+                f"  |  Stop ${lv['stop']:.2f}"
+                f"{tp_str}"
+                f"  <i>({lv['screen']})</i>"
+            )
 
         # Fundamentals snapshot + analyst consensus
         for fline in _fundamentals_lines(data.get("fundamentals") or {}, close=data.get("close")):
