@@ -100,13 +100,15 @@ def _ticker_close_series(history: pd.DataFrame, ticker: str) -> Optional[pd.Seri
 
 
 def compute_indicators(history: pd.DataFrame, ticker: str) -> dict:
-    """Return RSI(14, Wilder), SMA20/50/200, and last close. None on failure."""
-    out = {"rsi": None, "sma20": None, "sma50": None, "sma200": None, "last": None}
+    """Return RSI(14, Wilder), SMA20/50/200, ATR14, 52w high, and last close."""
+    out = {"rsi": None, "sma20": None, "sma50": None, "sma200": None, "last": None,
+           "atr14": None, "high52w": None}
     closes = _ticker_close_series(history, ticker)
     if closes is None or len(closes) < 20:
         return out
 
     out["last"] = round(float(closes.iloc[-1]), 2)
+    out["high52w"] = round(float(closes.tail(252).max()), 2)
     if len(closes) >= 20:
         out["sma20"] = round(float(closes.rolling(20).mean().iloc[-1]), 2)
     if len(closes) >= 50:
@@ -127,7 +129,84 @@ def compute_indicators(history: pd.DataFrame, ticker: str) -> dict:
         last_rsi = rsi.iloc[-1]
         if pd.notna(last_rsi):
             out["rsi"] = round(float(last_rsi), 1)
+
+    # ATR(14) — needs High/Low from history
+    try:
+        if isinstance(history.columns, pd.MultiIndex):
+            hi = history[ticker]["High"].dropna().astype(float)
+            lo = history[ticker]["Low"].dropna().astype(float)
+            cl = history[ticker]["Close"].dropna().astype(float)
+        else:
+            hi = history["High"].dropna().astype(float)
+            lo = history["Low"].dropna().astype(float)
+            cl = history["Close"].dropna().astype(float)
+        tr = pd.concat([hi - lo, (hi - cl.shift(1)).abs(), (lo - cl.shift(1)).abs()], axis=1).max(axis=1)
+        out["atr14"] = round(float(tr.ewm(alpha=1/14, adjust=False).mean().iloc[-1]), 4)
+    except Exception:
+        pass
+
     return out
+
+
+def compute_entry_levels(px: float, ind: dict, analyst_target: Optional[float]) -> dict:
+    """Derive entry zone, stop, and take-profit from pre-computed indicators."""
+    sma20  = ind.get("sma20")
+    sma50  = ind.get("sma50")
+    sma200 = ind.get("sma200")
+    rsi    = ind.get("rsi") or 50
+    atr    = ind.get("atr14") or px * 0.02   # fallback: 2% of price
+    high52 = ind.get("high52w") or px
+
+    screen = el = eh = st = None
+
+    if sma200 and px > sma200 and rsi < 35 and sma50 and abs(px / sma50 - 1) <= 0.05:
+        screen = "oversold pullback"
+        el, eh = px - 0.25 * atr, px + 0.25 * atr
+        st = sma200 * 0.98
+    elif sma200 and sma20 and sma50 and sma20 > sma50 > sma200 and 55 <= rsi <= 70 and px > sma20:
+        screen = "momentum"
+        el, eh = sma20 * 0.99, sma20 * 1.015
+        st = sma50 * 0.98
+    elif px >= high52 * 0.99:
+        screen = "breakout"
+        el, eh = high52 * 0.99, high52 * 1.01
+        st = high52 * 0.95
+    elif sma200 and px > sma200 and 40 < rsi < 55 and sma50:
+        screen = "uptrend cooling"
+        el, eh = sma50 * 0.99, sma50 * 1.01
+        st = sma200 * 0.98
+    elif rsi > 75 and sma20 and px > sma20 * 1.10:
+        screen = "extended"
+        el, eh = px - 0.25 * atr, px + 0.25 * atr
+        st = px + 1.5 * atr   # short stop above price
+    else:
+        screen = "no clean setup"
+        el, eh = px - 0.5 * atr, px + 0.5 * atr
+        st = px - 1.5 * atr
+
+    entry_mid = (el + eh) / 2
+    risk = abs(entry_mid - st)
+
+    # Take profit: analyst target if above entry zone, else 2R
+    tp = tp_source = None
+    if analyst_target and analyst_target > eh and screen != "extended":
+        tp = round(float(analyst_target), 2)
+        tp_source = "analyst PT"
+    elif risk > 0 and screen != "extended":
+        tp = round(entry_mid + 2 * risk, 2)
+        tp_source = "2R"
+
+    upside = round((tp / px - 1) * 100, 1) if tp else None
+
+    return {
+        "screen": screen,
+        "entry_low":  round(el, 2),
+        "entry_high": round(eh, 2),
+        "stop":       round(st, 2),
+        "tp":         tp,
+        "tp_source":  tp_source,
+        "upside":     upside,
+    }
 
 
 def _pick_news_fields(item: dict) -> tuple:
@@ -530,37 +609,33 @@ def synthesize_read(ticker: str, px: float, ind: dict, snap: dict, brief_line: O
 def synthesize_playbook(
     ticker: str, bucket: str, reason: str, px: float, cost: float, ind: dict, snap: dict
 ) -> str:
-    """1-line playbook with cost-basis-relative levels where relevant."""
+    """1-line playbook action with computed stop level."""
     target = snap.get("target_mean")
+    lv = compute_entry_levels(px, ind, target)
+    stop = lv.get("stop")
 
     if bucket == "TRIM":
-        # Suggest trim 25% with trail-stop framed against cost basis
-        sma20 = ind.get("sma20")
-        stop = None
-        if sma20 and sma20 > cost:
-            stop = sma20
-        elif sma20:
-            stop = max(round(cost * 1.05, 2), sma20)
         if stop:
             buf = (stop - cost) / cost * 100
             buf_sign = "+" if buf >= 0 else ""
-            return f"🎯 Trim 25% + trail stop ${stop:.0f} ({buf_sign}{buf:.0f}% vs ${cost:.2f} cost)"
-        return f"🎯 Trim 25% — {reason}"
+            return f"▶ Trim 25% · trail stop ${stop:.2f} ({buf_sign}{buf:.0f}% vs ${cost:.2f} cost)"
+        return f"▶ Trim 25% — {reason}"
 
     if bucket == "BUY":
         if target and px:
-            return f"🎯 Add on weakness · PT ${target:.0f} ({((target-px)/px*100):+.0f}%)"
-        return f"🎯 Accumulate — {reason}"
+            return f"▶ Add on weakness · PT ${target:.0f} ({((target-px)/px*100):+.0f}%) · stop ${stop:.2f}" if stop else f"▶ Add on weakness · PT ${target:.0f}"
+        return f"▶ Accumulate — {reason}"
 
     if bucket == "EXIT":
-        return f"🎯 Re-validate thesis or exit — {reason}"
+        return f"▶ Re-validate thesis or exit — {reason}"
 
     # HOLD
     if cost and px:
         gap = (px - cost) / cost * 100
         sign = "+" if gap >= 0 else ""
-        return f"🎯 Hold · stop {cost:.2f} cost ({sign}{gap:.0f}% from px)"
-    return f"🎯 Hold — {reason}"
+        stop_str = f" · stop ${stop:.2f}" if stop else ""
+        return f"▶ Hold{stop_str} · cost ${cost:.2f} ({sign}{gap:.0f}% from px)"
+    return f"▶ Hold — {reason}"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -649,6 +724,16 @@ def render_position_block(tkr, sh, c, px, pnl, pct, ind, snap, brief_line, strea
         extras.append(f"{arrow} {streak['streak']} sessions {streak['streak_dir']}")
     if extras:
         lines.append("📊 " + " · ".join(extras))
+
+    # Entry / stop / take-profit levels
+    lv = compute_entry_levels(px, ind, snap.get("target_mean"))
+    tp_str = f"  |  PT ${lv['tp']:.2f} ({lv['upside']:+.1f}%)" if lv.get("tp") else ""
+    lines.append(
+        f"🎯 Entry ${lv['entry_low']:.2f}–${lv['entry_high']:.2f}"
+        f"  |  Stop ${lv['stop']:.2f}"
+        f"{tp_str}"
+        f"  <i>({lv['screen']})</i>"
+    )
 
     # Read lines
     for line in synthesize_read(tkr, px, ind, snap, brief_line):
