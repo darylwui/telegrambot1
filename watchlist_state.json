@@ -306,9 +306,9 @@
         "entry_low": 13.61,
         "entry_high": 13.89,
         "stop": 8.43,
-        "tp": 14.89,
+        "tp": 15.04,
         "tp_source": "analyst PT",
-        "upside": 23.4
+        "upside": 24.6
       },
       "strategies": {
         "donchian_20_10": {
@@ -357,10 +357,10 @@
         "debt": 3324999936,
         "ps_ratio": 3.3697333,
         "short_pct_float": 0.0115,
-        "rec_key": "none",
-        "rec_label": "None",
+        "rec_key": "buy",
+        "rec_label": "Buy",
         "analyst_count": 9,
-        "target_mean": 14.88889,
+        "target_mean": 15.04444,
         "target_high": 21.0,
         "target_low": 8.5
       }
