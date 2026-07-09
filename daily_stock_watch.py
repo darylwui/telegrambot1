@@ -28,50 +28,49 @@ STRIKES = {
 THESES = {
     "AMZN": {
         "bull": (
-            "AWS growing 24% YoY on a $142B annualized run rate with a $244B backlog "
-            "(up 40% YoY); Bedrock AI spend grew 60% QoQ. Q1 2026 earnings April 29, "
-            "operating income guided $16.5–21.5B."
+            "AWS grew +28% YoY in Q1 2026 (fastest in 3+ years) at $37.6B; ad revenue "
+            "+24% YoY to $17.2B; record 13.1% consolidated operating margin. "
+            "EC2 AI capacity reservation prices raised ~20% effective Jul 1 signals pricing power."
         ),
         "bear": (
-            "$200B capex plan pressures near-term FCF; tariffs on imported goods and "
-            "consumer spending softness threaten the retail segment; elevated valuation "
-            "leaves limited downside cushion."
+            "FTC antitrust trial targeting marketplace monopoly scheduled Oct 2026; "
+            "$200B full-year capex suppresses near-term FCF; tariff-driven consumer "
+            "trade-down is cutting e-commerce growth projections from 7.9% to ~5.2%."
         ),
     },
     "GOOG": {
         "bull": (
-            "Alphabet crossed $400B in annual revenue in 2025; Google Cloud growing "
-            "~48% YoY; Q1 2026 earnings April 29 expected to beat as AI monetization "
-            "scales across Search and Cloud."
+            "Google Cloud +63% YoY in Q1 2026 with AI backlog nearly doubling to $462B; "
+            "DOJ remedy ruling avoided Chrome divestiture; Q1 net income +81% YoY to $62.6B."
         ),
         "bear": (
-            "DOJ antitrust remedies could unwind lucrative default-search distribution "
-            "deals; $175–$185B 2026 capex more than doubles prior-year spend; "
-            "OpenAI and Perplexity intensifying competition in AI-driven search."
+            "DOJ appealing remedy seeking Chrome divestiture; choice screens alone could "
+            "cost 5–8% of search traffic (~$15–25B annual ad revenue at risk); "
+            "AI Overviews cut advertiser click-through rates by an estimated 47%."
         ),
     },
     "META": {
         "bull": (
-            "Q1 2026 revenue guidance $53.5–$56.5B reflects AI-powered ad growth "
-            "accelerating to ~24% YoY; Advantage+ automation and Reels continue to "
-            "lift advertiser ROI; PayPal partnership expands commerce footprint."
+            "Q1 2026 revenue +33% YoY to $56.3B at 41% operating margin — fastest growth "
+            "since 2021; won FTC antitrust trial Nov 2025; AI glasses 69.2% market share "
+            "with Meta Connect catalyst Sep 23–24."
         ),
         "bear": (
-            "$115–$135B 2026 capex nearly doubles 2025 spend and will pressure FCF "
-            "for multiple quarters; Reality Labs operating losses persist; "
-            "macro headwinds from tariffs could soften H2 ad budgets."
+            "CapEx raised to $125–145B for 2026 triggered a ~7% after-hours selloff on "
+            "Q1 earnings; 8,000 additional layoffs alongside the hike signal uncertain "
+            "AI payoff timeline; FTC appeal on Instagram/WhatsApp divestiture still live."
         ),
     },
     "NVDA": {
         "bull": (
-            "Blackwell GPUs drove ~70% of data center compute revenue with 69% YoY "
-            "total revenue growth; sovereign AI demand and hyperscaler capex buildouts "
-            "sustaining structural GPU demand."
+            "Q1 FY2027 revenue $81.6B (+85% YoY); Q2 guidance $91B above $86.8B consensus; "
+            "Blackwell demand supply-constrained with 3.6M unit backlog; "
+            "hyperscaler combined AI capex estimated ~$725B for 2026."
         ),
         "bear": (
-            "Export restrictions expected to cost ~$8B in H20 revenue in Q2 FY2027; "
-            "prior $4.5B H20 charge already compressed gross margin to 61%; "
-            "further escalation of chip export controls to China is a direct earnings risk."
+            "China data center revenue effectively zero after H20 ban and H200 export "
+            "restrictions; gross margin guided down to 72% non-GAAP in Q2 on Blackwell "
+            "ramp costs; hyperscaler customer concentration creates event-driven drawdown risk."
         ),
     },
 }
