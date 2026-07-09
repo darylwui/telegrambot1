@@ -1,23 +1,23 @@
 {
-  "updated": "2026-06-26",
+  "updated": "2026-07-09",
   "positions": [
     {"ticker": "ADBE", "shares": 18,  "cost": 352.081},
     {"ticker": "AMZN", "shares": 50,  "cost": 183.389},
-    {"ticker": "AVGO", "shares": 30,  "cost": 320.35},
+    {"ticker": "AVGO", "shares": 30,  "cost": 319.70},
     {"ticker": "BLSH", "shares": 200, "cost": 37.875},
     {"ticker": "BTGO", "shares": 8,   "cost": 18.00},
     {"ticker": "COIN", "shares": 155, "cost": 235.302},
-    {"ticker": "CRWD", "shares": 20,  "cost": 250.00},
+    {"ticker": "CRWD", "shares": 80,  "cost": 62.50},
     {"ticker": "CRWV", "shares": 35,  "cost": 88.00},
     {"ticker": "GOOG", "shares": 40,  "cost": 240.758},
     {"ticker": "IREN", "shares": 25,  "cost": 53.00},
     {"ticker": "MSFT", "shares": 25,  "cost": 361.316},
     {"ticker": "NFLX", "shares": 100, "cost": 78.368},
     {"ticker": "NOW",  "shares": 80,  "cost": 109.20},
-    {"ticker": "NVDA", "shares": 400, "cost": 187.362},
+    {"ticker": "NVDA", "shares": 400, "cost": 187.112},
     {"ticker": "RDDT", "shares": 100, "cost": 155.564},
     {"ticker": "SE",   "shares": 230, "cost": 132.828},
-    {"ticker": "SNOW", "shares": 40,  "cost": 124.25},
+    {"ticker": "SNOW", "shares": 30,  "cost": 81.667},
     {"ticker": "TEAM", "shares": 60,  "cost": 119.527},
     {"ticker": "TSM",  "shares": 40,  "cost": 259.611}
   ]
