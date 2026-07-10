@@ -314,12 +314,23 @@ def build_message(prices, earnings_map, levels_map, date_str):
 # ── Telegram post ────────────────────────────────────────────────────────────────────
 
 def post(text):
-    resp = requests.post(
-        f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
-        data={"chat_id": CHAT_ID, "parse_mode": "HTML", "text": text},
-        timeout=15,
-    )
-    return resp.json()
+    try:
+        resp = requests.post(
+            f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+            data={"chat_id": CHAT_ID, "parse_mode": "HTML", "text": text},
+            timeout=15,
+        )
+        resp.raise_for_status()
+        return resp.json()
+    except requests.exceptions.ConnectionError as e:
+        print(f"CONNECTION ERROR posting to Telegram (api.telegram.org blocked by egress policy?): {e}")
+        sys.exit(1)
+    except requests.exceptions.HTTPError as e:
+        print(f"HTTP ERROR posting to Telegram: {e} — response: {e.response.text[:500]}")
+        sys.exit(1)
+    except requests.exceptions.Timeout:
+        print("TIMEOUT posting to Telegram")
+        sys.exit(1)
 
 # ── Main ──────────────────────────────────────────────────────────────────────────────
 
@@ -346,6 +357,7 @@ def main():
             levels_map[ticker] = None
 
     msg = build_message(prices, earnings_map, levels_map, date_str)
+    print(f"Message length: {len(msg)} chars")
 
     result = post(msg)
     if result.get("ok"):
