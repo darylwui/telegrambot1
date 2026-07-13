@@ -1,8 +1,11 @@
-name: Portfolio Watch (Morning)
+name: Portfolio Watch (Market Open)
 
 on:
   schedule:
-    - cron: '23 0 * * 2-6'   # 08:23 SGT (UTC+8), Tue–Sat
+    # US market open 09:30 ET = 13:30 UTC (EDT) / 14:30 UTC (EST). Mon–Fri.
+    # Winter (EST) this fires ~1h before the bell; GitHub's 2–4h scheduler
+    # drift means delivery still lands during/after the session either way.
+    - cron: '30 13 * * 1-5'   # 13:30 UTC — US open (EDT), ~21:30 SGT
   workflow_dispatch:
 
 permissions:
@@ -45,7 +48,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "no history change to commit"
           else
-            git commit -m "Portfolio snapshot: $(TZ=Asia/Singapore date +%Y-%m-%d) AM"
+            git commit -m "Portfolio snapshot: $(TZ=Asia/Singapore date +%Y-%m-%d) OPEN"
             git pull --rebase origin master || true
             git push
           fi
