@@ -1,8 +1,10 @@
-name: Portfolio Watch (Evening)
+name: Portfolio Watch (Market Close)
 
 on:
   schedule:
-    - cron: '19 12 * * 1-5'  # ~20:19 SGT (UTC+8), Mon–Fri — off the top of the hour to reduce GitHub scheduler drops
+    # US market close 16:00 ET = 20:00 UTC (EDT) / 21:00 UTC (EST). Mon–Fri.
+    # :02 dodges the top-of-hour peak that GitHub is most likely to drop.
+    - cron: '2 20 * * 1-5'   # 20:02 UTC — US close (EDT), ~04:02 SGT next day
   workflow_dispatch:
 
 permissions:
@@ -45,7 +47,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "no history change to commit"
           else
-            git commit -m "Portfolio snapshot: $(TZ=Asia/Singapore date +%Y-%m-%d) PM"
+            git commit -m "Portfolio snapshot: $(TZ=Asia/Singapore date +%Y-%m-%d) CLOSE"
             git pull --rebase origin master || true
             git push
           fi
