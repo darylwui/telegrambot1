@@ -2,7 +2,7 @@ name: Portfolio Watch (Evening)
 
 on:
   schedule:
-    - cron: '0 12 * * 1-5'  # 20:00 SGT (UTC+8), Mon–Fri
+    - cron: '19 12 * * 1-5'  # ~20:19 SGT (UTC+8), Mon–Fri — off the top of the hour to reduce GitHub scheduler drops
   workflow_dispatch:
 
 permissions:
