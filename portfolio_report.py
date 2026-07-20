@@ -34,6 +34,7 @@ import requests
 import yfinance as yf
 
 from clusters import CLUSTERS, SINGLE_NAME_THRESHOLD, CLUSTER_THRESHOLD, classify
+import garp
 
 try:
     from watchlist_signals import build_watchlist_section
@@ -701,7 +702,7 @@ def render_cluster_exposure(breakdown):
     return "\n".join(out)
 
 
-def render_position_block(tkr, sh, c, px, pnl, pct, ind, snap, brief_line, streak, weight):
+def render_position_block(tkr, sh, c, px, pnl, pct, ind, snap, brief_line, streak, weight, garp_score=None):
     if px is None:
         return f"<b>{tkr}</b>  {sh}@${c:.2f}  |  Last: unavailable"
 
@@ -743,6 +744,10 @@ def render_position_block(tkr, sh, c, px, pnl, pct, ind, snap, brief_line, strea
     if snap.get("earnings"):
         lines.append("📅 " + snap["earnings"])
 
+    # GARP quality score (informational — not a buy/sell trigger)
+    if garp_score is not None:
+        lines.append(garp.render_line(garp_score))
+
     return "\n".join(lines)
 
 
@@ -775,7 +780,7 @@ def render_action_plan(scored_rows, prices):
     return "<b>📑 Auto Action Plan</b>\n" + "\n".join(actions)
 
 
-def build_message(portfolio, prices, snapshots, indicators, history_state, brief_lines, date_str, session_label, history=None):
+def build_message(portfolio, prices, snapshots, indicators, history_state, brief_lines, date_str, session_label, history=None, garp_scores=None):
     sgt = pytz.timezone("Asia/Singapore")
     now_sgt = datetime.datetime.now(sgt)
     weekday = now_sgt.strftime("%a")
@@ -898,7 +903,8 @@ def build_message(portfolio, prices, snapshots, indicators, history_state, brief
             streak = compute_streak_and_delta(history_state, tkr, px, sh) if px else {}
             block = render_position_block(
                 tkr, sh, c, px, pnl, pct, ind, snap,
-                brief_lines.get(tkr), streak or {}, weight
+                brief_lines.get(tkr), streak or {}, weight,
+                garp_score=(garp_scores or {}).get(tkr),
             )
             playbook = synthesize_playbook(tkr, bucket, reason, px, c, ind, snap) if px else ""
             lines.append("")
@@ -911,6 +917,23 @@ def build_message(portfolio, prices, snapshots, indicators, history_state, brief
     if plan:
         lines.append("")
         lines.append(plan)
+
+    # ── Weekly GARP hunt list (Monday AM only — fundamentals move quarterly, not daily) ──
+    if now_sgt.weekday() == 0 and session_label == "AM":
+        try:
+            passers = garp.hunt_list(min_score=5)
+            if passers:
+                lines.append("")
+                lines.append("<b>⭐ Weekly GARP hunt list (score ≥ 5/6)</b>")
+                lines.append("<i>Long-horizon quality-value candidates from a curated large-cap universe. Informational — not a buy signal.</i>")
+                for p in passers[:15]:
+                    v = p["values"]
+                    fpe = f"fPE {v.get('fPE'):.1f}" if v.get("fPE") is not None else "fPE na"
+                    peg = f"PEG {v.get('PEG'):.1f}" if v.get("PEG") is not None else "PEG na"
+                    de = f"D/E {v.get('DE'):.0f}" if v.get("DE") is not None else "D/E —"
+                    lines.append(f"• <b>{p['ticker']}</b> {p['score']}/{p['max_score']}  ({fpe} · {de} · {peg})")
+        except Exception as e:
+            print(f"GARP hunt list skipped: {e}")
 
     # ── Portfolio diagnostics (factual, not trim/exit calls) ──
     if build_diagnostics_section is not None:
@@ -1068,11 +1091,21 @@ def main():
     brief_lines = fetch_brief_lines(date_str, tickers)
     print(f"Brief embed: {len(brief_lines)} ticker(s) matched")
 
+    # GARP quality scores (cached 7d; ~free after first-of-week miss)
+    print("Scoring GARP fundamentals…")
+    try:
+        garp_scores = garp.score_all(tickers)
+        cached_hits = sum(1 for r in garp_scores.values() if r.get("cached"))
+        print(f"  GARP: {len(garp_scores)} scored, {cached_hits} cache hits")
+    except Exception as e:
+        print(f"GARP scoring failed: {e}")
+        garp_scores = {}
+
     # State (history)
     state = load_state()
 
     # Build message before saving state, so streaks reflect prior state
-    msg = build_message(portfolio, prices, snapshots, indicators, state, brief_lines, date_str, session_label, history=history)
+    msg = build_message(portfolio, prices, snapshots, indicators, state, brief_lines, date_str, session_label, history=history, garp_scores=garp_scores)
 
     # Append today's snapshot AFTER building (don't pollute streaks with current)
     total_value = sum((p["shares"] * prices[p["ticker"]]) for p in portfolio["positions"] if prices.get(p["ticker"]))
