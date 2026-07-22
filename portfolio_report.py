@@ -674,22 +674,22 @@ def fetch_vix() -> Optional[dict]:
 
     if last < 12:
         regime = "Ultra-complacent"
-        extra = "often precedes vol spikes; not a sell signal but a size-awareness cue"
+        extra = "complacency stretched — don't chase or oversize longs; expect a vol spike soon"
     elif last < 15:
         regime = "Complacent"
-        extra = None
+        extra = "calm tape; momentum & breakouts work well; standard position sizes fit"
     elif last < 20:
         regime = "Normal"
-        extra = None
+        extra = "baseline market conditions; no size or stop adjustments needed"
     elif last < 25:
         regime = "Elevated"
-        extra = "larger daily swings likely; consider tighter stops on high-beta positions"
+        extra = "expect larger daily P/L swings; tighten stops on high-beta names; avoid new stretched entries"
     elif last < 30:
         regime = "High fear"
-        extra = "trim discretionary; keep to conviction plays"
+        extra = "risk-off tape; trim discretionary positions, hold conviction plays; wait for confirmation before adding"
     else:
         regime = "Panic/stressed"
-        extra = "preservation mode; VIX spikes near 30+ often mark short-term bottoms"
+        extra = "preservation mode; VIX ≥30 spikes often mark short-term bottoms — watch for reversal cues, don't panic-sell"
 
     return {"level": last, "prev": prev, "delta": delta, "delta_pct": delta_pct,
             "regime": regime, "extra": extra}
