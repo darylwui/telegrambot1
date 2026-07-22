@@ -695,6 +695,131 @@ def fetch_vix() -> Optional[dict]:
             "regime": regime, "extra": extra}
 
 
+def _safe_close_pair(hist) -> Optional[tuple]:
+    """Return (last, prev) close as floats, handling single- or multi-column DataFrame."""
+    try:
+        closes = hist["Close"].dropna()
+    except (KeyError, TypeError):
+        return None
+    if len(closes) < 2:
+        return None
+    def unwrap(x):
+        return float(x.iloc[0]) if hasattr(x, "iloc") else float(x)
+    try:
+        return unwrap(closes.iloc[-1]), unwrap(closes.iloc[-2])
+    except (AttributeError, TypeError, IndexError):
+        return None
+
+
+def fetch_yield_10y() -> Optional[dict]:
+    """10-year Treasury yield with delta in basis points and regime interpretation."""
+    try:
+        hist = yf.download("^TNX", period="5d", auto_adjust=False, progress=False)
+    except Exception as e:
+        print(f"10Y fetch failed: {e}"); return None
+    pair = _safe_close_pair(hist)
+    if not pair: return None
+    last, prev = pair
+    delta_bps = (last - prev) * 100  # yield is in percent already; ×100 → bps
+
+    if delta_bps > 5:
+        extra = "significant rate spike — headwind for growth (NVDA/MSFT/GOOG); watch small caps"
+    elif delta_bps > 2:
+        extra = "modest rate rise — mild headwind for high-multiple growth"
+    elif delta_bps < -5:
+        extra = "significant rate drop — bullish for growth, REITs, gold; watch TLT for continuation"
+    elif delta_bps < -2:
+        extra = "modest rate decline — mild tailwind for growth and rate-sensitives"
+    else:
+        extra = "rates stable — no rate-driven adjustment needed"
+
+    return {"level": last, "delta_bps": delta_bps, "extra": extra}
+
+
+def render_yield_line(y: Optional[dict]) -> Optional[str]:
+    if not y: return None
+    sd = "+" if y["delta_bps"] >= 0 else ""
+    return f"💰 <b>10Y</b> {y['level']:.2f}% ({sd}{y['delta_bps']:.0f}bps) · {y['extra']}"
+
+
+def fetch_dxy() -> Optional[dict]:
+    """DXY dollar index with delta % and regime interpretation."""
+    try:
+        hist = yf.download("DX-Y.NYB", period="5d", auto_adjust=False, progress=False)
+    except Exception as e:
+        print(f"DXY fetch failed: {e}"); return None
+    pair = _safe_close_pair(hist)
+    if not pair: return None
+    last, prev = pair
+    delta = last - prev
+    delta_pct = (delta / prev * 100) if prev else 0.0
+
+    if delta_pct > 0.5:
+        extra = "dollar strengthening sharply — headwind for BABA, commodities, USD-earning multinationals"
+    elif delta_pct > 0.1:
+        extra = "dollar firming — mild EM/commodity headwind"
+    elif delta_pct < -0.5:
+        extra = "dollar weakening sharply — tailwind for BABA, GLD, gold miners, EM equities"
+    elif delta_pct < -0.1:
+        extra = "dollar softening — mild tailwind for BABA, gold, USD-heavy multinationals"
+    else:
+        extra = "dollar stable — no FX-driven adjustment needed"
+
+    return {"level": last, "delta": delta, "delta_pct": delta_pct, "extra": extra}
+
+
+def render_dxy_line(d: Optional[dict]) -> Optional[str]:
+    if not d: return None
+    sd = "+" if d["delta_pct"] >= 0 else ""
+    return f"💵 <b>DXY</b> {d['level']:.2f} ({sd}{d['delta_pct']:.2f}%) · {d['extra']}"
+
+
+def fetch_spy_trend() -> Optional[dict]:
+    """SPY vs 200-day SMA — market regime read."""
+    try:
+        hist = yf.download("SPY", period="1y", auto_adjust=True, progress=False)
+    except Exception as e:
+        print(f"SPY fetch failed: {e}"); return None
+    try:
+        closes = hist["Close"].dropna()
+        if len(closes) < 200:
+            return None
+        def unwrap(x):
+            return float(x.iloc[0]) if hasattr(x, "iloc") else float(x)
+        last = unwrap(closes.iloc[-1])
+        sma200 = float(closes.rolling(200).mean().iloc[-1].iloc[0]) if hasattr(closes.rolling(200).mean().iloc[-1], 'iloc') else float(closes.rolling(200).mean().iloc[-1])
+    except Exception as e:
+        print(f"SPY trend calc failed: {e}"); return None
+
+    pct_above = (last - sma200) / sma200 * 100
+
+    if pct_above > 10:
+        regime = "Strong bull"
+        extra = "extended above SMA200 — momentum & breakouts favored, but stretched readings warrant profit-taking on winners"
+    elif pct_above > 0:
+        regime = "Bull trend intact"
+        extra = "favor momentum/continuation setups; standard sizing fits"
+    elif pct_above > -5:
+        regime = "Trend under pressure"
+        extra = "just below SMA200 — watch for reclaim vs failure; reduce new adds"
+    elif pct_above > -10:
+        regime = "Confirmed downtrend"
+        extra = "reduce discretionary risk; defensive positioning preferred"
+    else:
+        regime = "Bear market"
+        extra = "preservation mode — cash and defensives favored; avoid new long adds"
+
+    return {"level": last, "sma200": sma200, "pct_above": pct_above,
+            "regime": regime, "extra": extra}
+
+
+def render_trend_line(t: Optional[dict]) -> Optional[str]:
+    if not t: return None
+    sign = "+" if t["pct_above"] >= 0 else ""
+    return (f"📈 <b>SPY</b> ${t['level']:.0f} ({sign}{t['pct_above']:.1f}% vs SMA200) "
+            f"— {t['regime']} · {t['extra']}")
+
+
 def render_vix_line(vix: Optional[dict]) -> Optional[str]:
     """Format the VIX line. Returns None if fetch failed."""
     if not vix:
@@ -706,7 +831,8 @@ def render_vix_line(vix: Optional[dict]) -> Optional[str]:
             f"— {vix['regime']}{suffix}")
 
 
-def render_at_a_glance(total_value, total_cost, total_pnl, total_pct, alerts, weekly_delta, vix=None):
+def render_at_a_glance(total_value, total_cost, total_pnl, total_pct, alerts, weekly_delta,
+                       vix=None, yield_10y=None, dxy=None, spy_trend=None):
     sign_tot = "+" if total_pnl >= 0 else ""
     lines = [
         f"<b>Total:</b> ${total_value:,.0f}  |  "
@@ -716,9 +842,15 @@ def render_at_a_glance(total_value, total_cost, total_pnl, total_pct, alerts, we
     if weekly_delta is not None:
         sd = "+" if weekly_delta >= 0 else ""
         lines.append(f"<b>7-day Δ:</b> {sd}${weekly_delta:,.0f}")
-    vix_line = render_vix_line(vix)
-    if vix_line:
-        lines.append(vix_line)
+    for renderer, data in (
+        (render_vix_line, vix),
+        (render_yield_line, yield_10y),
+        (render_dxy_line, dxy),
+        (render_trend_line, spy_trend),
+    ):
+        line = renderer(data)
+        if line:
+            lines.append(line)
     for a in alerts:
         lines.append(f"🚨 {a}")
     return "\n".join(lines)
@@ -838,7 +970,7 @@ def render_action_plan(scored_rows, prices):
     return "<b>📑 Auto Action Plan</b>\n" + "\n".join(actions)
 
 
-def build_message(portfolio, prices, snapshots, indicators, history_state, brief_lines, date_str, session_label, history=None, garp_scores=None, vix=None):
+def build_message(portfolio, prices, snapshots, indicators, history_state, brief_lines, date_str, session_label, history=None, garp_scores=None, vix=None, yield_10y=None, dxy=None, spy_trend=None):
     sgt = pytz.timezone("Asia/Singapore")
     now_sgt = datetime.datetime.now(sgt)
     weekday = now_sgt.strftime("%a")
@@ -897,7 +1029,8 @@ def build_message(portfolio, prices, snapshots, indicators, history_state, brief
     alerts = concentration_alerts(rows, total_value, breakdown)
 
     # ── At a glance ──
-    lines.append(render_at_a_glance(total_value, total_cost, total_pnl, total_pct, alerts, weekly_delta, vix=vix))
+    lines.append(render_at_a_glance(total_value, total_cost, total_pnl, total_pct, alerts, weekly_delta,
+                                     vix=vix, yield_10y=yield_10y, dxy=dxy, spy_trend=spy_trend))
 
     # ── Time-sensitive ──
     ts_items = filter_time_sensitive(snapshots, session_label)
@@ -1159,17 +1292,22 @@ def main():
         print(f"GARP scoring failed: {e}")
         garp_scores = {}
 
-    # VIX market-sentiment context (informational)
-    print("Fetching VIX…")
+    # Macro context (informational — VIX + 10Y yield + DXY + SPY trend)
+    print("Fetching macro context…")
     vix = fetch_vix()
-    if vix:
-        print(f"  VIX {vix['level']:.1f} ({vix['regime']})")
+    yield_10y = fetch_yield_10y()
+    dxy = fetch_dxy()
+    spy_trend = fetch_spy_trend()
+    if vix:       print(f"  VIX {vix['level']:.1f} ({vix['regime']})")
+    if yield_10y: print(f"  10Y {yield_10y['level']:.2f}% ({yield_10y['delta_bps']:+.0f}bps)")
+    if dxy:       print(f"  DXY {dxy['level']:.2f} ({dxy['delta_pct']:+.2f}%)")
+    if spy_trend: print(f"  SPY {spy_trend['level']:.0f} ({spy_trend['pct_above']:+.1f}% vs SMA200 · {spy_trend['regime']})")
 
     # State (history)
     state = load_state()
 
     # Build message before saving state, so streaks reflect prior state
-    msg = build_message(portfolio, prices, snapshots, indicators, state, brief_lines, date_str, session_label, history=history, garp_scores=garp_scores, vix=vix)
+    msg = build_message(portfolio, prices, snapshots, indicators, state, brief_lines, date_str, session_label, history=history, garp_scores=garp_scores, vix=vix, yield_10y=yield_10y, dxy=dxy, spy_trend=spy_trend)
 
     # Append today's snapshot AFTER building (don't pollute streaks with current)
     total_value = sum((p["shares"] * prices[p["ticker"]]) for p in portfolio["positions"] if prices.get(p["ticker"]))
