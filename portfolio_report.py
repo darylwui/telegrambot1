@@ -651,7 +651,62 @@ BUCKET_META = {
 }
 
 
-def render_at_a_glance(total_value, total_cost, total_pnl, total_pct, alerts, weekly_delta):
+def fetch_vix() -> Optional[dict]:
+    """Fetch VIX level, prior close, delta, regime label, and (at extremes) an
+    interpretation note. Returns None on failure (informational, non-blocking)."""
+    try:
+        hist = yf.download("^VIX", period="5d", auto_adjust=False, progress=False)
+        closes = hist["Close"].dropna()
+        if len(closes) < 2:
+            return None
+        # yfinance may return single-column DataFrame; squeeze safely
+        try:
+            last = float(closes.iloc[-1].iloc[0]) if hasattr(closes.iloc[-1], 'iloc') else float(closes.iloc[-1])
+            prev = float(closes.iloc[-2].iloc[0]) if hasattr(closes.iloc[-2], 'iloc') else float(closes.iloc[-2])
+        except (AttributeError, TypeError):
+            last = float(closes.iloc[-1]); prev = float(closes.iloc[-2])
+    except Exception as e:
+        print(f"VIX fetch failed: {e}")
+        return None
+
+    delta = last - prev
+    delta_pct = (delta / prev * 100) if prev else 0.0
+
+    if last < 12:
+        regime = "Ultra-complacent"
+        extra = "often precedes vol spikes; not a sell signal but a size-awareness cue"
+    elif last < 15:
+        regime = "Complacent"
+        extra = None
+    elif last < 20:
+        regime = "Normal"
+        extra = None
+    elif last < 25:
+        regime = "Elevated"
+        extra = "larger daily swings likely; consider tighter stops on high-beta positions"
+    elif last < 30:
+        regime = "High fear"
+        extra = "trim discretionary; keep to conviction plays"
+    else:
+        regime = "Panic/stressed"
+        extra = "preservation mode; VIX spikes near 30+ often mark short-term bottoms"
+
+    return {"level": last, "prev": prev, "delta": delta, "delta_pct": delta_pct,
+            "regime": regime, "extra": extra}
+
+
+def render_vix_line(vix: Optional[dict]) -> Optional[str]:
+    """Format the VIX line. Returns None if fetch failed."""
+    if not vix:
+        return None
+    d = vix["delta"]; dp = vix["delta_pct"]
+    ds = "+" if d >= 0 else ""
+    suffix = f" · {vix['extra']}" if vix.get("extra") else ""
+    return (f"📊 <b>VIX</b> {vix['level']:.1f} ({ds}{d:.1f}, {ds}{dp:.1f}%) "
+            f"— {vix['regime']}{suffix}")
+
+
+def render_at_a_glance(total_value, total_cost, total_pnl, total_pct, alerts, weekly_delta, vix=None):
     sign_tot = "+" if total_pnl >= 0 else ""
     lines = [
         f"<b>Total:</b> ${total_value:,.0f}  |  "
@@ -661,6 +716,9 @@ def render_at_a_glance(total_value, total_cost, total_pnl, total_pct, alerts, we
     if weekly_delta is not None:
         sd = "+" if weekly_delta >= 0 else ""
         lines.append(f"<b>7-day Δ:</b> {sd}${weekly_delta:,.0f}")
+    vix_line = render_vix_line(vix)
+    if vix_line:
+        lines.append(vix_line)
     for a in alerts:
         lines.append(f"🚨 {a}")
     return "\n".join(lines)
@@ -780,7 +838,7 @@ def render_action_plan(scored_rows, prices):
     return "<b>📑 Auto Action Plan</b>\n" + "\n".join(actions)
 
 
-def build_message(portfolio, prices, snapshots, indicators, history_state, brief_lines, date_str, session_label, history=None, garp_scores=None):
+def build_message(portfolio, prices, snapshots, indicators, history_state, brief_lines, date_str, session_label, history=None, garp_scores=None, vix=None):
     sgt = pytz.timezone("Asia/Singapore")
     now_sgt = datetime.datetime.now(sgt)
     weekday = now_sgt.strftime("%a")
@@ -839,7 +897,7 @@ def build_message(portfolio, prices, snapshots, indicators, history_state, brief
     alerts = concentration_alerts(rows, total_value, breakdown)
 
     # ── At a glance ──
-    lines.append(render_at_a_glance(total_value, total_cost, total_pnl, total_pct, alerts, weekly_delta))
+    lines.append(render_at_a_glance(total_value, total_cost, total_pnl, total_pct, alerts, weekly_delta, vix=vix))
 
     # ── Time-sensitive ──
     ts_items = filter_time_sensitive(snapshots, session_label)
@@ -1101,11 +1159,17 @@ def main():
         print(f"GARP scoring failed: {e}")
         garp_scores = {}
 
+    # VIX market-sentiment context (informational)
+    print("Fetching VIX…")
+    vix = fetch_vix()
+    if vix:
+        print(f"  VIX {vix['level']:.1f} ({vix['regime']})")
+
     # State (history)
     state = load_state()
 
     # Build message before saving state, so streaks reflect prior state
-    msg = build_message(portfolio, prices, snapshots, indicators, state, brief_lines, date_str, session_label, history=history, garp_scores=garp_scores)
+    msg = build_message(portfolio, prices, snapshots, indicators, state, brief_lines, date_str, session_label, history=history, garp_scores=garp_scores, vix=vix)
 
     # Append today's snapshot AFTER building (don't pollute streaks with current)
     total_value = sum((p["shares"] * prices[p["ticker"]]) for p in portfolio["positions"] if prices.get(p["ticker"]))
