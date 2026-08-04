@@ -1,7 +1,7 @@
 """
 Earnings Spotlight — factual cards for notable upcoming earnings.
 
-Scope = S&P 100 ∪ portfolio.json ∪ watchlist.json, filtered to:
+Scope = S&P 100 ∪ portfolio.json, filtered to:
   - market cap >= MIN_MARKET_CAP
   - reporting in next HORIZON_DAYS
 
@@ -33,7 +33,6 @@ warnings.filterwarnings("ignore")
 HORIZON_DAYS = 7
 MIN_MARKET_CAP = 10_000_000_000  # $10B
 PORTFOLIO_FILE = "portfolio.json"
-WATCHLIST_FILE = "watchlist.json"
 SPX100_FILE = "spx100.json"
 CACHE_FILE = "earnings_cache.json"
 
@@ -47,18 +46,12 @@ REVISION_BEARISH_THRESHOLD = -0.02
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _load_universe() -> list[str]:
-    """S&P 100 + portfolio + watchlist, deduped."""
+    """S&P 100 + portfolio, deduped."""
     tickers: set[str] = set()
     if os.path.exists(PORTFOLIO_FILE):
         try:
             p = json.load(open(PORTFOLIO_FILE))
             tickers |= {x["ticker"].upper() for x in p.get("positions", []) if x.get("ticker")}
-        except Exception:
-            pass
-    if os.path.exists(WATCHLIST_FILE):
-        try:
-            w = json.load(open(WATCHLIST_FILE))
-            tickers |= {t.upper() for t in w.get("tickers", []) if t}
         except Exception:
             pass
     if os.path.exists(SPX100_FILE):
@@ -230,6 +223,115 @@ def _historical_moves(hist: pd.DataFrame, past_dates: list) -> list[float]:
     return moves
 
 
+def _rsi_from_hist(hist: pd.DataFrame, period: int = 14) -> Optional[float]:
+    """Wilder RSI on daily closes. Returns latest value or None."""
+    if hist is None or hist.empty or len(hist) < period + 1:
+        return None
+    close = hist["Close"].astype(float)
+    delta = close.diff()
+    gain = delta.clip(lower=0)
+    loss = -delta.clip(upper=0)
+    avg_gain = gain.ewm(alpha=1 / period, adjust=False).mean()
+    avg_loss = loss.ewm(alpha=1 / period, adjust=False).mean()
+    rs = avg_gain / avg_loss.replace(0, pd.NA)
+    rsi = 100 - (100 / (1 + rs))
+    try:
+        return float(rsi.iloc[-1])
+    except Exception:
+        return None
+
+
+def _buy_verdict(d: dict) -> tuple[str, str]:
+    """
+    Mechanical buy-at-current-levels call. Returns (label, reason).
+    Signals scored: target upside, revision momentum, RSI, beat rate.
+    """
+    score = 0
+    reasons: list[str] = []
+
+    upside = d.get("target_upside_pct")
+    if upside is not None:
+        if upside >= 15:
+            score += 2; reasons.append(f"target +{upside:.0f}%")
+        elif upside >= 5:
+            score += 1; reasons.append(f"target +{upside:.0f}%")
+        elif upside <= -5:
+            score -= 1; reasons.append(f"target {upside:.0f}%")
+
+    rev = d.get("revision_label") or ""
+    if "Bullish" in rev:
+        score += 1; reasons.append("↑ revisions")
+    elif "Cautious" in rev:
+        score -= 1; reasons.append("↓ revisions")
+
+    rsi = d.get("rsi")
+    if rsi is not None:
+        if rsi < 30:
+            score += 1; reasons.append(f"RSI {rsi:.0f} oversold")
+        elif rsi > 70:
+            score -= 1; reasons.append(f"RSI {rsi:.0f} overbought")
+
+    n = d.get("past_n") or 0
+    if n >= 3:
+        beat_rate = (d.get("beats") or 0) / n
+        if beat_rate >= 0.75:
+            score += 1; reasons.append(f"beats {d['beats']}/{n}")
+        elif beat_rate <= 0.25:
+            score -= 1; reasons.append(f"misses {d.get('misses',0)}/{n}")
+
+    if score >= 2:
+        label = "🟢 BUY"
+    elif score == 1:
+        label = "🟡 Nibble"
+    elif score == 0:
+        label = "⚪ Hold / wait"
+    else:
+        label = "🔴 Avoid"
+    return label, ", ".join(reasons) if reasons else "no clear signal"
+
+
+def _earnings_play_verdict(d: dict) -> tuple[str, str]:
+    """
+    Mechanical earnings-play call. Returns (label, reason).
+    Rewards proven movers with bullish setup; punishes flat or bearish.
+    """
+    score = 0
+    reasons: list[str] = []
+
+    avg_move = d.get("avg_abs_move")
+    if avg_move is not None:
+        if avg_move >= 8:
+            score += 2; reasons.append(f"|move| {avg_move:.1f}%")
+        elif avg_move >= 5:
+            score += 1; reasons.append(f"|move| {avg_move:.1f}%")
+        elif avg_move < 3:
+            score -= 1; reasons.append(f"|move| {avg_move:.1f}% quiet")
+
+    n = d.get("past_n") or 0
+    beat_rate = (d.get("beats") or 0) / n if n else 0
+    rev = d.get("revision_label") or ""
+    if n >= 3 and beat_rate >= 0.75 and "Bullish" in rev:
+        score += 2; reasons.append("beats + ↑ revs")
+    elif n >= 3 and (beat_rate <= 0.25 or "Cautious" in rev):
+        score -= 1
+        if beat_rate <= 0.25:
+            reasons.append(f"weak beat record")
+        if "Cautious" in rev:
+            reasons.append("↓ revs")
+
+    du = d.get("days_until")
+    if du is not None and 1 <= du <= 5:
+        score += 1
+
+    if score >= 3:
+        label = "🎯 Strong ER play"
+    elif score >= 1:
+        label = "🎲 Lottery — small size"
+    else:
+        label = "⏭️  Skip"
+    return label, ", ".join(reasons) if reasons else "no edge"
+
+
 def _revision_label(ticker_obj: yf.Ticker) -> tuple[Optional[str], Optional[float]]:
     """
     Compare current quarter EPS estimate vs 30-days-ago estimate.
@@ -303,19 +405,27 @@ def _dossier_for_ticker(tk: str, cache: dict) -> Optional[dict]:
     misses = int((past["Surprise(%)"] < 0).sum()) if "Surprise(%)" in past.columns else 0
     ins = int((past["Surprise(%)"] == 0).sum()) if "Surprise(%)" in past.columns else 0
 
+    # Always pull recent history — needed for RSI regardless of move calc.
+    try:
+        hist = t.history(period="3y", auto_adjust=True)
+    except Exception:
+        hist = pd.DataFrame()
+
     # Only compute earnings-day moves when we have ACTUAL announcement dates
-    # (Path 1 of _past_performance). If we only have fiscal-period-end dates
-    # (Path 2 fallback), the move calculation would measure unrelated price
-    # action — so skip it rather than report wrong numbers.
+    # (Path 1 of _past_performance). Fiscal-period-end fallback would measure
+    # unrelated price action, so skip it rather than report wrong numbers.
     moves: list[float] = []
     avg_abs_move = None
     if announcement_dates:
-        try:
-            hist = t.history(period="3y", auto_adjust=True)
-        except Exception:
-            hist = pd.DataFrame()
         moves = _historical_moves(hist, list(announcement_dates[:4]))
         avg_abs_move = (sum(abs(m) for m in moves) / len(moves)) if moves else None
+
+    rsi = _rsi_from_hist(hist)
+    price = info.get("currentPrice") or info.get("regularMarketPrice")
+    target = info.get("targetMeanPrice")
+    target_upside_pct = None
+    if isinstance(price, (int, float)) and isinstance(target, (int, float)) and price:
+        target_upside_pct = (target - price) / price * 100
 
     # Earnings call timing — BMO vs AMC heuristic from the timestamp hour
     next_dt = earnings["next_date"]
@@ -345,7 +455,7 @@ def _dossier_for_ticker(tk: str, cache: dict) -> Optional[dict]:
 
     rev_label, rev_delta = _revision_label(t)
 
-    return {
+    d = {
         "ticker": tk,
         "name": info.get("shortName") or info.get("longName") or tk,
         "next_date": next_dt.date(),
@@ -354,6 +464,10 @@ def _dossier_for_ticker(tk: str, cache: dict) -> Optional[dict]:
         "sector": info.get("sector"),
         "industry": info.get("industry"),
         "market_cap": market_cap,
+        "price": price,
+        "target_mean": target,
+        "target_upside_pct": target_upside_pct,
+        "rsi": rsi,
         "eps_est": earnings["eps_estimate_next"],
         "rev_est": rev_avg,
         "analyst_count": eps_count,
@@ -366,6 +480,9 @@ def _dossier_for_ticker(tk: str, cache: dict) -> Optional[dict]:
         "revision_label": rev_label,
         "revision_delta_pct": rev_delta,
     }
+    d["buy_verdict"], d["buy_reason"] = _buy_verdict(d)
+    d["play_verdict"], d["play_reason"] = _earnings_play_verdict(d)
+    return d
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -413,6 +530,20 @@ def _render_card(d: dict) -> list[str]:
     parts1.append(f"Mkt {mkt_s}")
     parts1.append(sector)
     lines.append("  " + " · ".join(parts1))
+
+    # Price / target / RSI line — only rendered when we have data
+    px_bits: list[str] = []
+    if isinstance(d.get("price"), (int, float)):
+        px_bits.append(f"Px ${d['price']:.2f}")
+    if isinstance(d.get("target_mean"), (int, float)):
+        up = d.get("target_upside_pct")
+        up_s = f" ({up:+.0f}%)" if up is not None else ""
+        px_bits.append(f"Tgt ${d['target_mean']:.2f}{up_s}")
+    if isinstance(d.get("rsi"), (int, float)):
+        px_bits.append(f"RSI {d['rsi']:.0f}")
+    if px_bits:
+        lines.append("  " + " · ".join(px_bits))
+
     lines.append(f"  Beat record: <b>{bm_s}</b> · Avg ⎮move⎮ {avg_s}")
     if d["moves"]:
         lines.append(f"  Past 4 moves: {moves_s}")
@@ -420,6 +551,10 @@ def _render_card(d: dict) -> list[str]:
         rev_delta = d["revision_delta_pct"]
         rev_pct_s = f" ({rev_delta:+.1f}% vs 30d ago)" if rev_delta is not None else ""
         lines.append(f"  {d['revision_label']}{rev_pct_s}")
+
+    # Verdicts — mechanical, from data
+    lines.append(f"  <b>{d['buy_verdict']}</b> at current — <i>{html.escape(d['buy_reason'])}</i>")
+    lines.append(f"  <b>{d['play_verdict']}</b> — <i>{html.escape(d['play_reason'])}</i>")
     return lines
 
 
@@ -460,7 +595,7 @@ def build_earnings_spotlight_section() -> Optional[str]:
     dossiers.sort(key=lambda x: (x["next_date"], x["ticker"]))
 
     lines = [f"<b>📈 Earnings Spotlight — next {HORIZON_DAYS} days</b>"]
-    lines.append(f"  <i>S&amp;P 100 ∪ portfolio ∪ watchlist, market cap ≥ {_fmt_money(MIN_MARKET_CAP)}</i>")
+    lines.append(f"  <i>S&amp;P 100 ∪ portfolio, market cap ≥ {_fmt_money(MIN_MARKET_CAP)}</i>")
 
     cur_date = None
     for d in dossiers:
@@ -473,8 +608,8 @@ def build_earnings_spotlight_section() -> Optional[str]:
 
     lines.append("")
     lines.append(
-        "<i>Pure data: consensus, beat history, historical earnings-day moves. "
-        "Revision label is mechanical from current vs 30-day-ago consensus.</i>"
+        "<i>Verdicts are mechanical from data (target upside, revisions, RSI, "
+        "beat rate, historical earnings-day move) — not editorial. Sanity-check before acting.</i>"
     )
     return "\n".join(lines)
 
