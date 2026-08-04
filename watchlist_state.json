@@ -1,22 +1,22 @@
 {
   "tickers": {
     "IONQ": {
-      "as_of": "2026-08-03",
-      "close": 38.85,
-      "atr14": 3.38,
-      "rsi14": 46.5,
-      "sma20": 37.39,
-      "sma50": 50.39,
-      "sma200": 46.1,
+      "as_of": "2026-07-31",
+      "close": 36.44,
+      "atr14": 3.276,
+      "rsi14": 41.2,
+      "sma20": 37.89,
+      "sma50": 50.66,
+      "sma200": 46.3,
       "high52w": 82.09,
       "levels": {
         "screen": "no clean setup",
-        "entry_low": 37.16,
-        "entry_high": 40.54,
-        "stop": 33.78,
-        "tp": 68.41,
+        "entry_low": 34.8,
+        "entry_high": 38.08,
+        "stop": 31.53,
+        "tp": 67.02,
         "tp_source": "analyst PT",
-        "upside": 76.1
+        "upside": 83.9
       },
       "strategies": {
         "donchian_20_10": {
@@ -24,35 +24,35 @@
           "last_flip_date": "2026-06-25",
           "entry_price_if_long": null,
           "unrealized_pct": null,
-          "trigger_detail": "trigger \u2191 $51.33 (+32.1%)"
+          "trigger_detail": "trigger \u2191 $54.40 (+49.3%)"
         },
         "sma_20_50": {
           "state": "FLAT",
           "last_flip_date": "2026-07-07",
           "entry_price_if_long": null,
           "unrealized_pct": null,
-          "trigger_detail": "SMA20 $37.39 \u00b7 SMA50 $50.39 \u00b7 gap -25.8%"
+          "trigger_detail": "SMA20 $37.89 \u00b7 SMA50 $50.66 \u00b7 gap -25.2%"
         },
         "trend_filter": {
           "state": "FLAT",
           "last_flip_date": "2026-07-02",
           "entry_price_if_long": null,
           "unrealized_pct": null,
-          "trigger_detail": "SMA20/50/200 $37.39/$50.39/$46.10 \u00b7 regime \u2717 below 200"
+          "trigger_detail": "SMA20/50/200 $37.89/$50.66/$46.30 \u00b7 regime \u2717 below 200"
         },
         "macd": {
           "state": "LONG",
           "last_flip_date": "2026-07-30",
           "entry_price_if_long": 36.49,
-          "unrealized_pct": 6.47,
-          "trigger_detail": "MACD -3.833 \u00b7 signal -4.671 \u00b7 gap +0.838"
+          "unrealized_pct": -0.14,
+          "trigger_detail": "MACD -4.382 \u00b7 signal -4.881 \u00b7 gap +0.499"
         },
         "atr_trail": {
           "state": "FLAT",
           "last_flip_date": "2026-07-07",
           "entry_price_if_long": null,
           "unrealized_pct": null,
-          "trigger_detail": "SMA20 $37.39 \u00b7 SMA50 $50.39 \u00b7 gap -25.8%"
+          "trigger_detail": "SMA20 $37.89 \u00b7 SMA50 $50.66 \u00b7 gap -25.2%"
         }
       },
       "fundamentals": {
@@ -67,29 +67,29 @@
         "short_pct_float": 0.1267,
         "rec_key": "strong_buy",
         "rec_label": "Strong Buy",
-        "analyst_count": 13,
-        "target_mean": 68.40615,
+        "analyst_count": 12,
+        "target_mean": 67.02333,
         "target_high": 100.0,
         "target_low": 44.78
       }
     },
     "ONDS": {
-      "as_of": "2026-08-03",
-      "close": 8.37,
-      "atr14": 0.748,
-      "rsi14": 54.7,
-      "sma20": 7.44,
-      "sma50": 8.81,
-      "sma200": 9.3,
+      "as_of": "2026-07-31",
+      "close": 7.49,
+      "atr14": 0.713,
+      "rsi14": 46.7,
+      "sma20": 7.41,
+      "sma50": 8.83,
+      "sma200": 9.31,
       "high52w": 14.01,
       "levels": {
         "screen": "no clean setup",
-        "entry_low": 8.0,
-        "entry_high": 8.74,
-        "stop": 7.25,
+        "entry_low": 7.13,
+        "entry_high": 7.85,
+        "stop": 6.42,
         "tp": 19.81,
         "tp_source": "analyst PT",
-        "upside": 136.7
+        "upside": 164.5
       },
       "strategies": {
         "donchian_20_10": {
@@ -97,35 +97,35 @@
           "last_flip_date": "2026-06-22",
           "entry_price_if_long": null,
           "unrealized_pct": null,
-          "trigger_detail": "trigger \u2191 $8.58 (+2.5%)"
+          "trigger_detail": "trigger \u2191 $8.58 (+14.6%)"
         },
         "sma_20_50": {
           "state": "FLAT",
           "last_flip_date": "2026-06-26",
           "entry_price_if_long": null,
           "unrealized_pct": null,
-          "trigger_detail": "SMA20 $7.44 \u00b7 SMA50 $8.81 \u00b7 gap -15.6%"
+          "trigger_detail": "SMA20 $7.41 \u00b7 SMA50 $8.83 \u00b7 gap -16.1%"
         },
         "trend_filter": {
           "state": "FLAT",
           "last_flip_date": "2026-06-16",
           "entry_price_if_long": null,
           "unrealized_pct": null,
-          "trigger_detail": "SMA20/50/200 $7.44/$8.81/$9.30 \u00b7 regime \u2717 below 200"
+          "trigger_detail": "SMA20/50/200 $7.41/$8.83/$9.31 \u00b7 regime \u2717 below 200"
         },
         "macd": {
           "state": "LONG",
           "last_flip_date": "2026-07-21",
           "entry_price_if_long": 7.8,
-          "unrealized_pct": 7.31,
-          "trigger_detail": "MACD -0.186 \u00b7 signal -0.343 \u00b7 gap +0.157"
+          "unrealized_pct": -3.97,
+          "trigger_detail": "MACD -0.274 \u00b7 signal -0.382 \u00b7 gap +0.109"
         },
         "atr_trail": {
           "state": "FLAT",
           "last_flip_date": "2026-06-26",
           "entry_price_if_long": null,
           "unrealized_pct": null,
-          "trigger_detail": "SMA20 $7.44 \u00b7 SMA50 $8.81 \u00b7 gap -15.6%"
+          "trigger_detail": "SMA20 $7.41 \u00b7 SMA50 $8.83 \u00b7 gap -16.1%"
         }
       },
       "fundamentals": {
@@ -147,22 +147,22 @@
       }
     },
     "VRT": {
-      "as_of": "2026-08-03",
-      "close": 263.05,
-      "atr14": 22.153,
-      "rsi14": 42.7,
-      "sma20": 288.4,
-      "sma50": 304.67,
-      "sma200": 246.68,
+      "as_of": "2026-07-31",
+      "close": 241.57,
+      "atr14": 21.613,
+      "rsi14": 34.8,
+      "sma20": 291.17,
+      "sma50": 305.72,
+      "sma200": 246.24,
       "high52w": 376.15,
       "levels": {
-        "screen": "uptrend cooling",
-        "entry_low": 301.62,
-        "entry_high": 307.72,
-        "stop": 241.75,
+        "screen": "no clean setup",
+        "entry_low": 230.76,
+        "entry_high": 252.38,
+        "stop": 209.15,
         "tp": 339.35,
         "tp_source": "analyst PT",
-        "upside": 29.0
+        "upside": 40.5
       },
       "strategies": {
         "donchian_20_10": {
@@ -170,35 +170,35 @@
           "last_flip_date": "2026-07-28",
           "entry_price_if_long": null,
           "unrealized_pct": null,
-          "trigger_detail": "trigger \u2191 $338.88 (+28.8%)"
+          "trigger_detail": "trigger \u2191 $338.88 (+40.3%)"
         },
         "sma_20_50": {
           "state": "FLAT",
           "last_flip_date": "2026-06-15",
           "entry_price_if_long": null,
           "unrealized_pct": null,
-          "trigger_detail": "SMA20 $288.40 \u00b7 SMA50 $304.67 \u00b7 gap -5.3%"
+          "trigger_detail": "SMA20 $291.17 \u00b7 SMA50 $305.72 \u00b7 gap -4.8%"
         },
         "trend_filter": {
           "state": "FLAT",
           "last_flip_date": "2026-06-15",
           "entry_price_if_long": null,
           "unrealized_pct": null,
-          "trigger_detail": "SMA20/50/200 $288.40/$304.67/$246.68 \u00b7 regime \u2713 above 200"
+          "trigger_detail": "SMA20/50/200 $291.17/$305.72/$246.24 \u00b7 regime \u2717 below 200"
         },
         "macd": {
           "state": "FLAT",
           "last_flip_date": "2026-07-13",
           "entry_price_if_long": null,
           "unrealized_pct": null,
-          "trigger_detail": "MACD -17.336 \u00b7 signal -12.046 \u00b7 gap -5.290"
+          "trigger_detail": "MACD -18.128 \u00b7 signal -10.723 \u00b7 gap -7.405"
         },
         "atr_trail": {
           "state": "FLAT",
           "last_flip_date": "2026-06-15",
           "entry_price_if_long": null,
           "unrealized_pct": null,
-          "trigger_detail": "SMA20 $288.40 \u00b7 SMA50 $304.67 \u00b7 gap -5.3%"
+          "trigger_detail": "SMA20 $291.17 \u00b7 SMA50 $305.72 \u00b7 gap -4.8%"
         }
       },
       "fundamentals": {
@@ -220,22 +220,22 @@
       }
     },
     "GENB": {
-      "as_of": "2026-08-03",
-      "close": 14.34,
-      "atr14": 0.929,
-      "rsi14": 51.1,
-      "sma20": 14.16,
-      "sma50": 14.29,
+      "as_of": "2026-07-31",
+      "close": 14.0,
+      "atr14": 0.948,
+      "rsi14": 47.9,
+      "sma20": 14.29,
+      "sma50": 14.27,
       "sma200": null,
       "high52w": 17.41,
       "levels": {
         "screen": "no clean setup",
-        "entry_low": 13.88,
-        "entry_high": 14.8,
-        "stop": 12.95,
+        "entry_low": 13.53,
+        "entry_high": 14.47,
+        "stop": 12.58,
         "tp": 25.4,
         "tp_source": "analyst PT",
-        "upside": 77.1
+        "upside": 81.4
       },
       "strategies": {
         "donchian_20_10": {
@@ -243,14 +243,14 @@
           "last_flip_date": "2026-07-10",
           "entry_price_if_long": null,
           "unrealized_pct": null,
-          "trigger_detail": "trigger \u2191 $17.89 (+24.8%)"
+          "trigger_detail": "trigger \u2191 $17.89 (+27.8%)"
         },
         "sma_20_50": {
-          "state": "FLAT",
-          "last_flip_date": "2026-08-03",
-          "entry_price_if_long": null,
-          "unrealized_pct": null,
-          "trigger_detail": "SMA20 $14.16 \u00b7 SMA50 $14.29 \u00b7 gap -0.9%"
+          "state": "LONG",
+          "last_flip_date": "2026-06-24",
+          "entry_price_if_long": 16.36,
+          "unrealized_pct": -14.43,
+          "trigger_detail": "SMA20 $14.29 \u00b7 SMA50 $14.27 \u00b7 gap +0.2%"
         },
         "trend_filter": {
           "state": "FLAT",
@@ -264,14 +264,14 @@
           "last_flip_date": "2026-07-09",
           "entry_price_if_long": null,
           "unrealized_pct": null,
-          "trigger_detail": "MACD -0.270 \u00b7 signal -0.267 \u00b7 gap -0.003"
+          "trigger_detail": "MACD -0.331 \u00b7 signal -0.266 \u00b7 gap -0.065"
         },
         "atr_trail": {
-          "state": "FLAT",
-          "last_flip_date": "2026-08-03",
-          "entry_price_if_long": null,
-          "unrealized_pct": null,
-          "trigger_detail": "SMA20 $14.16 \u00b7 SMA50 $14.29 \u00b7 gap -0.9%"
+          "state": "LONG",
+          "last_flip_date": "2026-07-16",
+          "entry_price_if_long": 13.33,
+          "unrealized_pct": 5.03,
+          "trigger_detail": "HWM $14.39 \u00b7 trailing stop $11.55 (-17.5%)"
         }
       },
       "fundamentals": {
@@ -293,22 +293,22 @@
       }
     },
     "NOK": {
-      "as_of": "2026-08-03",
-      "close": 9.36,
-      "atr14": 0.713,
-      "rsi14": 37.3,
-      "sma20": 10.42,
-      "sma50": 12.81,
-      "sma200": 9.19,
+      "as_of": "2026-07-31",
+      "close": 9.14,
+      "atr14": 0.718,
+      "rsi14": 34.9,
+      "sma20": 10.57,
+      "sma50": 12.9,
+      "sma200": 9.17,
       "high52w": 16.85,
       "levels": {
-        "screen": "uptrend cooling",
-        "entry_low": 12.68,
-        "entry_high": 12.94,
-        "stop": 9.01,
+        "screen": "no clean setup",
+        "entry_low": 8.78,
+        "entry_high": 9.5,
+        "stop": 8.06,
         "tp": 15.02,
         "tp_source": "analyst PT",
-        "upside": 60.5
+        "upside": 64.3
       },
       "strategies": {
         "donchian_20_10": {
@@ -316,46 +316,46 @@
           "last_flip_date": "2026-06-09",
           "entry_price_if_long": null,
           "unrealized_pct": null,
-          "trigger_detail": "trigger \u2191 $13.13 (+40.3%)"
+          "trigger_detail": "trigger \u2191 $13.13 (+43.7%)"
         },
         "sma_20_50": {
           "state": "FLAT",
           "last_flip_date": "2026-07-06",
           "entry_price_if_long": null,
           "unrealized_pct": null,
-          "trigger_detail": "SMA20 $10.42 \u00b7 SMA50 $12.81 \u00b7 gap -18.7%"
+          "trigger_detail": "SMA20 $10.57 \u00b7 SMA50 $12.90 \u00b7 gap -18.0%"
         },
         "trend_filter": {
           "state": "FLAT",
           "last_flip_date": "2026-07-06",
           "entry_price_if_long": null,
           "unrealized_pct": null,
-          "trigger_detail": "SMA20/50/200 $10.42/$12.81/$9.19 \u00b7 regime \u2713 above 200"
+          "trigger_detail": "SMA20/50/200 $10.57/$12.90/$9.17 \u00b7 regime \u2717 below 200"
         },
         "macd": {
           "state": "FLAT",
           "last_flip_date": "2026-06-05",
           "entry_price_if_long": null,
           "unrealized_pct": null,
-          "trigger_detail": "MACD -1.067 \u00b7 signal -1.040 \u00b7 gap -0.027"
+          "trigger_detail": "MACD -1.123 \u00b7 signal -1.033 \u00b7 gap -0.089"
         },
         "atr_trail": {
           "state": "FLAT",
           "last_flip_date": "2026-07-02",
           "entry_price_if_long": null,
           "unrealized_pct": null,
-          "trigger_detail": "SMA20 $10.42 \u00b7 SMA50 $12.81 \u00b7 gap -18.7%"
+          "trigger_detail": "SMA20 $10.57 \u00b7 SMA50 $12.90 \u00b7 gap -18.0%"
         }
       },
       "fundamentals": {
-        "market_cap": null,
+        "market_cap": 52252516352,
         "fifty_two_high": 17.45,
         "fifty_two_low": 4.06,
         "beta": 0.76,
         "revenue_ttm": 20394000384,
         "cash": 5129999872,
         "debt": 3359000064,
-        "ps_ratio": null,
+        "ps_ratio": 2.5621514,
         "short_pct_float": 0.009,
         "rec_key": "buy",
         "rec_label": "Buy",
