@@ -1,7 +1,7 @@
 """
 Earnings Spotlight — factual cards for notable upcoming earnings.
 
-Scope = S&P 100 ∪ portfolio.json, filtered to:
+Scope = S&P 500 ∪ portfolio.json, filtered to:
   - market cap >= MIN_MARKET_CAP
   - reporting in next HORIZON_DAYS
 
@@ -33,8 +33,10 @@ warnings.filterwarnings("ignore")
 HORIZON_DAYS = 7
 MIN_MARKET_CAP = 10_000_000_000  # $10B
 PORTFOLIO_FILE = "portfolio.json"
-SPX100_FILE = "spx100.json"
+UNIVERSE_FILE = "spx500.json"
 CACHE_FILE = "earnings_cache.json"
+
+MAX_WORKERS = 12  # parallel yfinance fetches
 
 # Revision-momentum thresholds, mechanical from data
 REVISION_BULLISH_THRESHOLD = 0.02   # current consensus > 30d-ago by 2%+
@@ -46,7 +48,7 @@ REVISION_BEARISH_THRESHOLD = -0.02
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _load_universe() -> list[str]:
-    """S&P 100 + portfolio, deduped."""
+    """S&P 500 + portfolio, deduped."""
     tickers: set[str] = set()
     if os.path.exists(PORTFOLIO_FILE):
         try:
@@ -54,9 +56,9 @@ def _load_universe() -> list[str]:
             tickers |= {x["ticker"].upper() for x in p.get("positions", []) if x.get("ticker")}
         except Exception:
             pass
-    if os.path.exists(SPX100_FILE):
+    if os.path.exists(UNIVERSE_FILE):
         try:
-            sp = json.load(open(SPX100_FILE))
+            sp = json.load(open(UNIVERSE_FILE))
             tickers |= {t.upper() for t in sp.get("tickers", []) if t}
         except Exception:
             pass
@@ -568,19 +570,23 @@ def build_earnings_spotlight_section() -> Optional[str]:
     cache = _load_cache()
     cache_size_before = sum(1 for v in cache.values() if v)
 
-    print(f"[spotlight] scanning {len(universe)} tickers (cache: {cache_size_before} entries)...")
+    print(f"[spotlight] scanning {len(universe)} tickers "
+          f"(cache: {cache_size_before} entries, workers: {MAX_WORKERS})...")
     dossiers: list[dict] = []
     errors = 0
-    for tk in universe:
-        try:
-            d = _dossier_for_ticker(tk, cache)
-            if d:
-                dossiers.append(d)
-        except Exception as e:
-            errors += 1
-            if errors <= 3:  # Don't flood the log; first 3 errors only
-                print(f"[spotlight] {tk}: {type(e).__name__}: {str(e)[:80]}")
-            continue
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as ex:
+        futures = {ex.submit(_dossier_for_ticker, tk, cache): tk for tk in universe}
+        for fut in as_completed(futures):
+            tk = futures[fut]
+            try:
+                d = fut.result()
+                if d:
+                    dossiers.append(d)
+            except Exception as e:
+                errors += 1
+                if errors <= 3:
+                    print(f"[spotlight] {tk}: {type(e).__name__}: {str(e)[:80]}")
 
     cache_size_after = sum(1 for v in cache.values() if v)
     if cache_size_after != cache_size_before:
@@ -595,7 +601,7 @@ def build_earnings_spotlight_section() -> Optional[str]:
     dossiers.sort(key=lambda x: (x["next_date"], x["ticker"]))
 
     lines = [f"<b>📈 Earnings Spotlight — next {HORIZON_DAYS} days</b>"]
-    lines.append(f"  <i>S&amp;P 100 ∪ portfolio, market cap ≥ {_fmt_money(MIN_MARKET_CAP)}</i>")
+    lines.append(f"  <i>S&amp;P 500 ∪ portfolio, market cap ≥ {_fmt_money(MIN_MARKET_CAP)}</i>")
 
     cur_date = None
     for d in dossiers:
