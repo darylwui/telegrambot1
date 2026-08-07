@@ -1,5 +1,5 @@
 {
-  "updated": "2026-08-04",
+  "updated": "2026-08-07",
   "positions": [
     {"ticker": "ADBE", "shares": 18,  "cost": 352.081},
     {"ticker": "AMZN", "shares": 50,  "cost": 183.389},
@@ -15,7 +15,6 @@
     {"ticker": "NFLX", "shares": 100, "cost": 78.368},
     {"ticker": "NOW",  "shares": 80,  "cost": 109.20},
     {"ticker": "NVDA", "shares": 400, "cost": 187.112},
-    {"ticker": "PLTR", "shares": 12,  "cost": 125.50},
     {"ticker": "RDDT", "shares": 100, "cost": 155.564},
     {"ticker": "SE",   "shares": 230, "cost": 132.828},
     {"ticker": "SNOW", "shares": 20,  "cost": -28.75},
