@@ -1,7 +1,7 @@
 """
 Earnings Spotlight — factual cards for notable upcoming earnings.
 
-Scope = S&P 500 ∪ portfolio.json, filtered to:
+Scope = S&P 500 ∪ portfolio.json ∪ earnings_extras.json, filtered to:
   - market cap >= MIN_MARKET_CAP
   - reporting in next HORIZON_DAYS
 
@@ -34,6 +34,7 @@ HORIZON_DAYS = 7
 MIN_MARKET_CAP = 10_000_000_000  # $10B
 PORTFOLIO_FILE = "portfolio.json"
 UNIVERSE_FILE = "spx500.json"
+EXTRAS_FILE = "earnings_extras.json"
 CACHE_FILE = "earnings_cache.json"
 
 MAX_WORKERS = 12  # parallel yfinance fetches
@@ -48,20 +49,19 @@ REVISION_BEARISH_THRESHOLD = -0.02
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _load_universe() -> list[str]:
-    """S&P 500 + portfolio, deduped."""
+    """S&P 500 + portfolio + extras, deduped."""
     tickers: set[str] = set()
-    if os.path.exists(PORTFOLIO_FILE):
+    for path in (PORTFOLIO_FILE, UNIVERSE_FILE, EXTRAS_FILE):
+        if not os.path.exists(path):
+            continue
         try:
-            p = json.load(open(PORTFOLIO_FILE))
-            tickers |= {x["ticker"].upper() for x in p.get("positions", []) if x.get("ticker")}
+            d = json.load(open(path))
         except Exception:
-            pass
-    if os.path.exists(UNIVERSE_FILE):
-        try:
-            sp = json.load(open(UNIVERSE_FILE))
-            tickers |= {t.upper() for t in sp.get("tickers", []) if t}
-        except Exception:
-            pass
+            continue
+        if "positions" in d:
+            tickers |= {x["ticker"].upper() for x in d["positions"] if x.get("ticker")}
+        if "tickers" in d:
+            tickers |= {t.upper() for t in d["tickers"] if t}
     return sorted(tickers)
 
 

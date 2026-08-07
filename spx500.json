@@ -403,7 +403,6 @@
     "SBAC",
     "SBUX",
     "SCHW",
-    "SHOP",
     "SHW",
     "SJM",
     "SLB",
@@ -506,8 +505,5 @@
     "ZTS"
   ],
   "_source": "wikipedia S&P 500 list",
-  "_note": "Yahoo ticker convention: BRK.B -> BRK-B",
-  "_extras": [
-    "SHOP (Canadian, not in S&P 500 index but liquid US-traded ADR/dual-listed)"
-  ]
+  "_note": "Yahoo ticker convention: BRK.B -> BRK-B"
 }

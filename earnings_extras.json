@@ -1,0 +1,14 @@
+{
+  "_comment": "Non-S&P-500 large-cap names to scan for earnings. Merged with spx500.json + portfolio.json in earnings_spotlight.py. Add tickers here whenever you notice a name you follow is missing from the spotlight.",
+  "tickers": [
+    "SHOP",
+    "NET",
+    "MELI",
+    "MDB",
+    "DDOG",
+    "ZS",
+    "DASH",
+    "HOOD",
+    "ARM"
+  ]
+}
