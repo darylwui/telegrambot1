@@ -1,11 +1,10 @@
 {
-  "updated": "2026-08-07",
+  "updated": "2026-08-10",
   "positions": [
     {"ticker": "ADBE", "shares": 18,  "cost": 352.081},
     {"ticker": "AMZN", "shares": 50,  "cost": 183.389},
     {"ticker": "AVGO", "shares": 30,  "cost": 319.70},
     {"ticker": "BLSH", "shares": 200, "cost": 37.875},
-    {"ticker": "BTGO", "shares": 8,   "cost": 18.00},
     {"ticker": "COIN", "shares": 185, "cost": 219.714},
     {"ticker": "CRWD", "shares": 80,  "cost": 62.50},
     {"ticker": "CRWV", "shares": 70,  "cost": 75.90},
@@ -18,7 +17,7 @@
     {"ticker": "RDDT", "shares": 100, "cost": 155.564},
     {"ticker": "SE",   "shares": 230, "cost": 132.828},
     {"ticker": "SNOW", "shares": 20,  "cost": -28.75},
-    {"ticker": "TEAM", "shares": 60,  "cost": 119.527},
+    {"ticker": "TEAM", "shares": 30,  "cost": 89.055},
     {"ticker": "TSM",  "shares": 40,  "cost": 258.672}
   ]
 }
