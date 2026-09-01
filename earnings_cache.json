@@ -45,6 +45,11 @@
   ],
   "MDT": [
     {
+      "date": "2026-09-01T06:00:00-04:00",
+      "reported_eps": 1.45,
+      "surprise_pct": 4.51
+    },
+    {
       "date": "2026-06-03T06:00:00-04:00",
       "reported_eps": 1.55,
       "surprise_pct": 0.56
@@ -58,11 +63,6 @@
       "date": "2025-11-18T06:00:00-05:00",
       "reported_eps": 1.36,
       "surprise_pct": 3.49
-    },
-    {
-      "date": "2025-08-19T06:00:00-04:00",
-      "reported_eps": 1.26,
-      "surprise_pct": 2.54
     }
   ],
   "AAPL": [
@@ -3234,7 +3234,7 @@
     {
       "date": "2026-03-17T16:00:00-04:00",
       "reported_eps": 5.01,
-      "surprise_pct": 4.83
+      "surprise_pct": 4.77
     },
     {
       "date": "2025-12-11T16:00:00-05:00",
@@ -3267,6 +3267,28 @@
       "date": "2025-09-02T16:00:00-04:00",
       "reported_eps": 0.89,
       "surprise_pct": 11.03
+    }
+  ],
+  "CASY": [
+    {
+      "date": "2026-06-09T16:00:00-04:00",
+      "reported_eps": 4.37,
+      "surprise_pct": 32.11
+    },
+    {
+      "date": "2026-03-09T16:00:00-04:00",
+      "reported_eps": 3.49,
+      "surprise_pct": 16.87
+    },
+    {
+      "date": "2025-12-09T16:00:00-05:00",
+      "reported_eps": 5.53,
+      "surprise_pct": 6.26
+    },
+    {
+      "date": "2025-09-08T16:00:00-04:00",
+      "reported_eps": 5.77,
+      "surprise_pct": 15.35
     }
   ]
 }
