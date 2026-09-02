@@ -3290,5 +3290,27 @@
       "reported_eps": 5.77,
       "surprise_pct": 15.35
     }
+  ],
+  "COO": [
+    {
+      "date": "2026-06-04T16:00:00-04:00",
+      "reported_eps": 1.21,
+      "surprise_pct": 10.52
+    },
+    {
+      "date": "2026-03-05T16:00:00-05:00",
+      "reported_eps": 1.1,
+      "surprise_pct": 7.05
+    },
+    {
+      "date": "2025-12-04T16:00:00-05:00",
+      "reported_eps": 1.15,
+      "surprise_pct": 3.29
+    },
+    {
+      "date": "2025-08-27T16:00:00-04:00",
+      "reported_eps": 1.1,
+      "surprise_pct": 3.04
+    }
   ]
 }
