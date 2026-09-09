@@ -3334,5 +3334,27 @@
       "reported_eps": 1.04,
       "surprise_pct": 4.25
     }
+  ],
+  "LEN": [
+    {
+      "date": "2026-06-11T16:00:00-04:00",
+      "reported_eps": 1.31,
+      "surprise_pct": 6.15
+    },
+    {
+      "date": "2026-03-12T16:00:00-04:00",
+      "reported_eps": 0.88,
+      "surprise_pct": -7.23
+    },
+    {
+      "date": "2025-12-16T16:00:00-05:00",
+      "reported_eps": 2.03,
+      "surprise_pct": -6.84
+    },
+    {
+      "date": "2025-09-18T17:00:00-04:00",
+      "reported_eps": 2.0,
+      "surprise_pct": -4.52
+    }
   ]
 }
