@@ -3359,6 +3359,11 @@
   ],
   "AZO": [
     {
+      "date": "2026-09-22T06:00:00-04:00",
+      "reported_eps": 56.05,
+      "surprise_pct": 4.01
+    },
+    {
       "date": "2026-05-26T06:00:00-04:00",
       "reported_eps": 38.07,
       "surprise_pct": 5.26
@@ -3372,11 +3377,6 @@
       "date": "2025-12-09T06:00:00-05:00",
       "reported_eps": 31.04,
       "surprise_pct": -4.04
-    },
-    {
-      "date": "2025-09-23T06:00:00-04:00",
-      "reported_eps": 48.71,
-      "surprise_pct": -3.88
     }
   ],
   "CTAS": [
@@ -3465,6 +3465,28 @@
       "date": "2025-09-18T07:00:00-04:00",
       "reported_eps": 1.97,
       "surprise_pct": -2.05
+    }
+  ],
+  "CCL": [
+    {
+      "date": "2026-06-23T09:00:00-04:00",
+      "reported_eps": 0.41,
+      "surprise_pct": 21.08
+    },
+    {
+      "date": "2026-03-27T09:00:00-04:00",
+      "reported_eps": 0.2,
+      "surprise_pct": 8.94
+    },
+    {
+      "date": "2025-12-19T09:00:00-05:00",
+      "reported_eps": 0.34,
+      "surprise_pct": 38.64
+    },
+    {
+      "date": "2025-09-29T09:00:00-04:00",
+      "reported_eps": 1.43,
+      "surprise_pct": 8.54
     }
   ]
 }
