@@ -1,12 +1,12 @@
 {
-  "updated": "2026-08-10",
+  "updated": "2026-10-06",
   "positions": [
     {"ticker": "ADBE", "shares": 18,  "cost": 352.081},
     {"ticker": "AMZN", "shares": 50,  "cost": 183.389},
     {"ticker": "AVGO", "shares": 30,  "cost": 319.70},
     {"ticker": "BLSH", "shares": 200, "cost": 37.875},
     {"ticker": "COIN", "shares": 185, "cost": 219.714},
-    {"ticker": "CRWD", "shares": 80,  "cost": 62.50},
+    {"ticker": "CRWD", "shares": 50,  "cost": 62.50},
     {"ticker": "CRWV", "shares": 70,  "cost": 75.90},
     {"ticker": "GOOG", "shares": 40,  "cost": 240.758},
     {"ticker": "IREN", "shares": 75,  "cost": 38.20},
