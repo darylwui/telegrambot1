@@ -263,9 +263,9 @@ def fetch_snapshot(ticker: str, current_px: Optional[float]) -> dict:
     if target_mean and current_px:
         upside = (target_mean - current_px) / current_px * 100
         sign = "+" if upside >= 0 else ""
-        parts.append(f"PT ${target_mean:.0f} ({sign}{upside:.0f}%)")
+        parts.append(f"Street PT ${target_mean:.0f} ({sign}{upside:.0f}%)")
     elif target_mean:
-        parts.append(f"PT ${target_mean:.0f}")
+        parts.append(f"Street PT ${target_mean:.0f}")
     if parts:
         out["analyst"] = " | ".join(parts)
     out["target_mean"] = target_mean
@@ -306,6 +306,7 @@ def fetch_brief_lines(date_str: str, tickers: list[str]) -> dict[str, str]:
     '### N. NVDA — ...' from briefs/YYYY-MM-DD.md in BRIEF_REPO.
     """
     if not BRIEF_REPO_TOKEN:
+        print("Brief embed skipped: BRIEF_REPO_TOKEN not set")
         return {}
     headers = {
         "Authorization": f"token {BRIEF_REPO_TOKEN}",
@@ -317,12 +318,17 @@ def fetch_brief_lines(date_str: str, tickers: list[str]) -> dict[str, str]:
         url = f"https://api.github.com/repos/{BRIEF_REPO}/contents/briefs/{d}.md"
         try:
             r = requests.get(url, headers=headers, timeout=15)
-            if r.status_code == 200:
-                text = r.text
-                break
         except Exception as e:
             print(f"brief fetch failed for {d}: {e}")
             continue
+        if r.status_code == 200:
+            text = r.text
+            break
+        if r.status_code in (401, 403):
+            print(f"Brief embed: HTTP {r.status_code} — BRIEF_REPO_TOKEN expired or lacks "
+                  f"contents:read on {BRIEF_REPO}; rotate the secret")
+            return {}
+        print(f"Brief embed: HTTP {r.status_code} for briefs/{d}.md")
     if not text:
         return {}
 
@@ -335,8 +341,10 @@ def fetch_brief_lines(date_str: str, tickers: list[str]) -> dict[str, str]:
             # Match common brief shapes
             patterns = [f"**{tkr} ", f"**{tkr}**", f"**{tkr}—", f"**{tkr}/", f"# {tkr} ", f"# {tkr}—"]
             if any(p in line for p in patterns):
-                # Strip markdown bullet prefix and bold markers
-                cleaned = line.lstrip("- ").lstrip("# ").strip()
+                # Lines can list several tickers separated by " / " — keep only this ticker's segment.
+                segments = [s for s in line.split(" / ") if any(p in s for p in patterns)]
+                chosen = segments[0] if segments else line
+                cleaned = chosen.lstrip("- ").lstrip("# ").replace("**", "").replace("`", "").strip()
                 # Truncate runaway-long lines
                 if len(cleaned) > 280:
                     cleaned = cleaned[:277] + "..."
@@ -648,7 +656,7 @@ def synthesize_playbook(
 
     if bucket == "BUY":
         if target and px:
-            return f"▶ Add on weakness · PT ${target:.0f} ({((target-px)/px*100):+.0f}%) · stop ${stop:.2f}" if stop else f"▶ Add on weakness · PT ${target:.0f}"
+            return f"▶ Add on weakness · street PT ${target:.0f} ({((target-px)/px*100):+.0f}%) · stop ${stop:.2f}" if stop else f"▶ Add on weakness · street PT ${target:.0f}"
         return f"▶ Accumulate — {reason}"
 
     if bucket == "EXIT":
@@ -753,23 +761,43 @@ def fetch_yield_10y() -> Optional[dict]:
     delta_bps = (last - prev) * 100  # yield is in percent already; ×100 → bps
 
     if delta_bps > 5:
-        extra = "significant rate spike — headwind for growth (NVDA/MSFT/GOOG); watch small caps"
+        move = "significant rate spike — headwind for growth (NVDA/MSFT/GOOG); watch small caps"
     elif delta_bps > 2:
-        extra = "modest rate rise — mild headwind for high-multiple growth"
+        move = "modest rate rise — mild headwind for high-multiple growth"
     elif delta_bps < -5:
-        extra = "significant rate drop — bullish for growth, REITs, gold; watch TLT for continuation"
+        move = "significant rate drop — bullish for growth, REITs, gold; watch TLT for continuation"
     elif delta_bps < -2:
-        extra = "modest rate decline — mild tailwind for growth and rate-sensitives"
+        move = "modest rate decline — mild tailwind for growth and rate-sensitives"
     else:
+        move = "stable today"
+
+    # The level matters as much as the daily move for a growth-heavy book.
+    if last >= 5.0:
+        level = "restrictive level — pressure on long-duration growth multiples; keep growth sizing tight"
+    elif last >= 4.5:
+        level = "elevated level — growth multiples capped; favor earnings-backed names"
+    elif last < 3.5:
+        level = "accommodative level — supportive for growth"
+    else:
+        level = None
+
+    if level and move == "stable today":
+        extra = f"stable today, but {level}"
+    elif level:
+        extra = f"{move}; {level}"
+    elif move == "stable today":
         extra = "rates stable — no rate-driven adjustment needed"
+    else:
+        extra = move
 
     return {"level": last, "delta_bps": delta_bps, "extra": extra}
 
 
 def render_yield_line(y: Optional[dict]) -> Optional[str]:
     if not y: return None
-    sd = "+" if y["delta_bps"] >= 0 else ""
-    return f"💰 <b>10Y</b> {y['level']:.2f}% ({sd}{y['delta_bps']:.0f}bps) · {y['extra']}"
+    bps = round(y["delta_bps"]) + 0  # +0 turns -0 into 0
+    sd = "+" if bps >= 0 else ""
+    return f"💰 <b>10Y</b> {y['level']:.2f}% ({sd}{bps}bps) · {y['extra']}"
 
 
 def fetch_dxy() -> Optional[dict]:
@@ -955,7 +983,8 @@ def render_position_block(tkr, sh, c, px, pnl, pct, ind, snap, brief_line, strea
 
     # Entry / stop / take-profit levels
     lv = compute_entry_levels(px, ind, snap.get("target_mean"))
-    tp_str = f"  |  PT ${lv['tp']:.2f} ({lv['upside']:+.1f}%)" if lv.get("tp") else ""
+    tp_src = {"analyst PT": "street", "2R": "2R"}.get(lv.get("tp_source"), "")
+    tp_str = f"  |  Target ${lv['tp']:.2f} ({lv['upside']:+.1f}%, {tp_src})" if lv.get("tp") else ""
     lines.append(
         f"🎯 Entry ${lv['entry_low']:.2f}–${lv['entry_high']:.2f}"
         f"  |  Stop ${lv['stop']:.2f}"
