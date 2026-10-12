@@ -519,41 +519,69 @@ def filter_time_sensitive(snapshots: dict, session: str) -> list[tuple]:
     return out
 
 
-def score_position(px, target_mean, pnl_pct, rating_score, portfolio_pct, rsi, earnings_days=None) -> tuple:
+ADD_BLOCK_ER_DAYS = 5      # no adds this close to an earnings print
+ADD_BLOCK_RSI = 65         # no adds into overbought names
+ADD_BLOCK_SMA20_EXT = 8.0  # no adds when px is this % above SMA20
+
+
+def _fmt_gain(pnl_pct: float) -> str:
+    """Gain label; cost basis <= 0 (house money) has no meaningful %."""
+    if pnl_pct == float("inf"):
+        return "house money"
+    return f"{pnl_pct:+.0f}%"
+
+
+def score_position(px, target_mean, pnl_pct, rating_score, portfolio_pct, rsi, earnings_days=None,
+                   cluster_over: Optional[str] = None, sma20_ext: Optional[float] = None) -> tuple:
     """Return (bucket, reason). Buckets: TRIM, BUY, HOLD, EXIT.
 
-    Adds RSI + ER-binary awareness on top of the prior rule engine.
+    pnl_pct is +inf for house-money positions (cost basis <= 0).
+    cluster_over names the position's cluster when it already breaches CLUSTER_THRESHOLD.
+    sma20_ext is % distance of px above SMA20.
     """
     if px is None or target_mean is None:
         return "HOLD", "Incomplete data"
 
     upside = (target_mean - px) / px * 100
+    gain = _fmt_gain(pnl_pct)
 
     # TRIM signals
     if earnings_days is not None and 0 <= earnings_days <= 1 and pnl_pct >= 15:
-        return "TRIM", f"ER in {earnings_days}d + green {pnl_pct:.0f}% — protect gain"
+        return "TRIM", f"ER in {earnings_days}d + {gain} — protect gain"
     if portfolio_pct > SINGLE_NAME_THRESHOLD and pnl_pct > 15:
-        return "TRIM", f"Oversized ({portfolio_pct:.0f}% of book) + +{pnl_pct:.0f}% gain"
+        return "TRIM", f"Oversized ({portfolio_pct:.0f}% of book), {gain} gain"
     if rsi is not None and rsi > 80 and pnl_pct > 10:
         return "TRIM", f"RSI {rsi:.0f} extended + green position — bank some"
     if pnl_pct >= 40 and rsi is not None and rsi >= 65:
-        return "TRIM", f"+{pnl_pct:.0f}% gain + RSI {rsi:.0f} — extended"
+        return "TRIM", f"{gain} gain + RSI {rsi:.0f} — extended"
     if px >= target_mean and portfolio_pct > 10:
         return "TRIM", f"At/above PT (${target_mean:.0f}) + sized {portfolio_pct:.0f}%"
     if pnl_pct >= 30 and portfolio_pct > 10:
-        return "TRIM", f"+{pnl_pct:.0f}% gain on a {portfolio_pct:.0f}% position"
+        return "TRIM", f"{gain} gain on a {portfolio_pct:.0f}% position"
 
     # EXIT signals (worse than SELL — full exit candidate)
     if upside <= -15 and rating_score <= -1:
         return "EXIT", f"PT ${target_mean:.0f} below px + bearish ({rating_score})"
 
     # BUY signals
+    buy_reason = None
     if pnl_pct <= -25 and rating_score >= 2 and (rsi is None or rsi < 40):
-        return "BUY", f"Underwater {pnl_pct:.0f}% + buy rating + RSI {rsi or 'na'} = avg-down zone"
-    if upside >= 25 and rating_score >= 2:
-        return "BUY", f"+{upside:.0f}% upside + buy rating"
-    if upside >= 15 and rating_score >= 2 and portfolio_pct < 3:
-        return "BUY", f"+{upside:.0f}% upside, micro position ({portfolio_pct:.1f}%)"
+        buy_reason = f"Underwater {pnl_pct:.0f}% + buy rating + RSI {rsi or 'na'} = avg-down zone"
+    elif upside >= 25 and rating_score >= 2:
+        buy_reason = f"+{upside:.0f}% upside + buy rating"
+    elif upside >= 15 and rating_score >= 2 and portfolio_pct < 3:
+        buy_reason = f"+{upside:.0f}% upside, micro position ({portfolio_pct:.1f}%)"
+
+    if buy_reason:
+        if cluster_over:
+            return "HOLD", f"Add blocked — {cluster_over} cluster over {CLUSTER_THRESHOLD:.0f}%"
+        if earnings_days is not None and 0 <= earnings_days <= ADD_BLOCK_ER_DAYS:
+            return "HOLD", f"Add blocked — earnings in {earnings_days}d, wait for the print"
+        if rsi is not None and rsi >= ADD_BLOCK_RSI:
+            return "HOLD", f"Add blocked — RSI {rsi:.0f}, wait for pullback"
+        if sma20_ext is not None and sma20_ext >= ADD_BLOCK_SMA20_EXT:
+            return "HOLD", f"Add blocked — {sma20_ext:.0f}% above SMA20, wait for pullback"
+        return "BUY", buy_reason
 
     # HOLD
     if px >= target_mean:
@@ -610,10 +638,12 @@ def synthesize_playbook(
     stop = lv.get("stop")
 
     if bucket == "TRIM":
-        if stop:
+        if stop and cost > 0:
             buf = (stop - cost) / cost * 100
             buf_sign = "+" if buf >= 0 else ""
             return f"▶ Trim 25% · trail stop ${stop:.2f} ({buf_sign}{buf:.0f}% vs ${cost:.2f} cost)"
+        if stop:
+            return f"▶ Trim 25% · trail stop ${stop:.2f} (house money)"
         return f"▶ Trim 25% — {reason}"
 
     if bucket == "BUY":
@@ -625,6 +655,12 @@ def synthesize_playbook(
         return f"▶ Re-validate thesis or exit — {reason}"
 
     # HOLD
+    if reason.startswith("Add blocked"):
+        stop_str = f" · stop ${stop:.2f}" if stop else ""
+        return f"▶ Hold — {reason}{stop_str}"
+    if cost <= 0:
+        stop_str = f" · stop ${stop:.2f}" if stop else ""
+        return f"▶ Hold{stop_str} · house money"
     if cost and px:
         gap = (px - cost) / cost * 100
         sign = "+" if gap >= 0 else ""
@@ -640,7 +676,7 @@ def synthesize_playbook(
 BUCKET_META = {
     "TRIM": ("🔻", "Trim / risk-down"),
     "EXIT": ("🚫", "Exit / re-validate"),
-    "BUY": ("🟢", "Add-down candidates"),
+    "BUY": ("🟢", "Add candidates"),
     "HOLD": ("⏸", "Hold steady"),
 }
 
@@ -860,7 +896,8 @@ def render_time_sensitive(items, snapshots, rows_by_ticker, brief_lines):
             continue
         sh, c, px, pnl, pct = row
         sign = "+" if pnl >= 0 else ""
-        out.append(f"• <b>{tkr}</b> — {label} · {sign}{pct:.0f}% ({sign}${pnl:,.0f})")
+        pct_s = "house money" if c <= 0 else f"{sign}{pct:.0f}%"
+        out.append(f"• <b>{tkr}</b> — {label} · {pct_s} ({sign}${pnl:,.0f})")
         bl = brief_lines.get(tkr)
         if bl and "HARD EXIT" in bl.upper():
             out.append(f"  ⚠️ Brief: HARD EXIT before close")
@@ -891,9 +928,15 @@ def render_position_block(tkr, sh, c, px, pnl, pct, ind, snap, brief_line, strea
         return f"<b>{tkr}</b>  {sh}@${c:.2f}  |  Last: unavailable"
 
     sign = "+" if pnl >= 0 else ""
+    if c <= 0:
+        header = f"<b>{tkr}</b>  {sh} sh · house money (cost recovered)"
+        pct_str = ""
+    else:
+        header = f"<b>{tkr}</b>  {sh}@${c:.2f}"
+        pct_str = f"{sign}{pct:.1f}% "
     lines = [
-        f"<b>{tkr}</b>  {sh}@${c:.2f}",
-        f"💵 Px ${px:.2f} · {sign}{pct:.1f}% ({sign}${pnl:,.0f}) · {weight:.1f}% of book"
+        header,
+        f"💵 Px ${px:.2f} · {pct_str}({sign}${pnl:,.0f}) · {weight:.1f}% of book"
     ]
 
     # Streak / 7d delta as a single status line
@@ -992,7 +1035,7 @@ def build_message(portfolio, prices, snapshots, indicators, history_state, brief
             continue
         value = sh * px
         pnl = value - cost_basis
-        pnl_pct = pnl / cost_basis * 100 if cost_basis else 0.0
+        pnl_pct = pnl / cost_basis * 100 if cost_basis > 0 else float("inf")
         total_value += value
         rows.append((tkr, sh, c, px, pnl, pnl_pct))
         rows_by_ticker[tkr] = (sh, c, px, pnl, pnl_pct)
@@ -1057,14 +1100,20 @@ def build_message(portfolio, prices, snapshots, indicators, history_state, brief
         lines.append(block)
 
     # ── Score and bucket positions ──
+    over_clusters = {cl for cl, _v, pct, _t in breakdown if pct > CLUSTER_THRESHOLD}
     scored = []
     for tkr, sh, c, px, pnl, pct in rows:
         weight = (sh * px / total_value * 100) if (px and total_value) else 0
         snap = snapshots.get(tkr) or {}
         ind = indicators.get(tkr) or {}
+        cl = classify(tkr)
+        sma20 = ind.get("sma20")
+        sma20_ext = (px / sma20 - 1) * 100 if (px and sma20) else None
         bucket, reason = score_position(
             px, snap.get("target_mean"), pct, snap.get("rating_score", 0),
-            weight, ind.get("rsi"), snap.get("earnings_days")
+            weight, ind.get("rsi"), snap.get("earnings_days"),
+            cluster_over=cl if cl in over_clusters else None,
+            sma20_ext=sma20_ext,
         )
         scored.append((tkr, bucket, reason, sh, c, px, pnl, pct, weight, snap, ind))
 

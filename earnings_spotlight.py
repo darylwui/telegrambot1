@@ -38,6 +38,7 @@ EXTRAS_FILE = "earnings_extras.json"
 CACHE_FILE = "earnings_cache.json"
 
 MAX_WORKERS = 12  # parallel yfinance fetches
+MAX_IDEAS = 8     # non-portfolio cards shown
 
 # Revision-momentum thresholds, mechanical from data
 REVISION_BULLISH_THRESHOLD = 0.02   # current consensus > 30d-ago by 2%+
@@ -243,95 +244,110 @@ def _rsi_from_hist(hist: pd.DataFrame, period: int = 14) -> Optional[float]:
         return None
 
 
-def _buy_verdict(d: dict) -> tuple[str, str]:
+def _join_reasons(pros: list[str], cons: list[str]) -> str:
+    parts = []
+    if pros:
+        parts.append(", ".join(pros))
+    if cons:
+        parts.append("against: " + ", ".join(cons))
+    return " · ".join(parts) if parts else "no clear signal"
+
+
+def _buy_verdict(d: dict) -> tuple[str, str, int]:
     """
-    Mechanical buy-at-current-levels call. Returns (label, reason).
-    Signals scored: target upside, revision momentum, RSI, beat rate.
+    Mechanical buy-at-current-levels call. Returns (label, reason, score).
+    Upside alone can't carry a BUY — it needs confirmation from at least two
+    other signals (revisions, RSI, beat record).
     """
     score = 0
-    reasons: list[str] = []
+    pros: list[str] = []
+    cons: list[str] = []
 
     upside = d.get("target_upside_pct")
     if upside is not None:
-        if upside >= 15:
-            score += 2; reasons.append(f"target +{upside:.0f}%")
-        elif upside >= 5:
-            score += 1; reasons.append(f"target +{upside:.0f}%")
-        elif upside <= -5:
-            score -= 1; reasons.append(f"target {upside:.0f}%")
+        if upside >= 20:
+            score += 2; pros.append(f"target +{upside:.0f}%")
+        elif upside >= 10:
+            score += 1; pros.append(f"target +{upside:.0f}%")
+        elif upside < 0:
+            score -= 2; cons.append(f"above target ({upside:.0f}%)")
 
-    rev = d.get("revision_label") or ""
-    if "Bullish" in rev:
-        score += 1; reasons.append("↑ revisions")
-    elif "Cautious" in rev:
-        score -= 1; reasons.append("↓ revisions")
+    rev_delta = d.get("revision_delta_pct")
+    if rev_delta is not None:
+        if rev_delta >= 2:
+            score += 1; pros.append(f"↑ revs {rev_delta:+.0f}%")
+        elif rev_delta <= -10:
+            score -= 2; cons.append(f"↓ revs {rev_delta:+.0f}%")
+        elif rev_delta <= -2:
+            score -= 1; cons.append(f"↓ revs {rev_delta:+.0f}%")
 
     rsi = d.get("rsi")
     if rsi is not None:
         if rsi < 30:
-            score += 1; reasons.append(f"RSI {rsi:.0f} oversold")
+            score += 1; pros.append(f"RSI {rsi:.0f} oversold")
         elif rsi > 70:
-            score -= 1; reasons.append(f"RSI {rsi:.0f} overbought")
+            score -= 1; cons.append(f"RSI {rsi:.0f} overbought")
 
     n = d.get("past_n") or 0
     if n >= 3:
         beat_rate = (d.get("beats") or 0) / n
         if beat_rate >= 0.75:
-            score += 1; reasons.append(f"beats {d['beats']}/{n}")
+            score += 1; pros.append(f"beats {d['beats']}/{n}")
         elif beat_rate <= 0.25:
-            score -= 1; reasons.append(f"misses {d.get('misses',0)}/{n}")
+            score -= 1; cons.append(f"misses {d.get('misses', 0)}/{n}")
 
-    if score >= 2:
+    if score >= 4:
         label = "🟢 BUY"
-    elif score == 1:
+    elif score >= 2:
         label = "🟡 Nibble"
-    elif score == 0:
-        label = "⚪ Hold / wait"
+    elif score >= 0:
+        label = "⚪ Wait"
     else:
         label = "🔴 Avoid"
-    return label, ", ".join(reasons) if reasons else "no clear signal"
+    return label, _join_reasons(pros, cons), score
 
 
-def _earnings_play_verdict(d: dict) -> tuple[str, str]:
+def _earnings_play_verdict(d: dict) -> tuple[str, str, int]:
     """
-    Mechanical earnings-play call. Returns (label, reason).
-    Rewards proven movers with bullish setup; punishes flat or bearish.
+    Mechanical earnings-play call. Returns (label, reason, score).
+    A name that historically barely moves on earnings is never a play.
     """
-    score = 0
-    reasons: list[str] = []
-
     avg_move = d.get("avg_abs_move")
-    if avg_move is not None:
-        if avg_move >= 8:
-            score += 2; reasons.append(f"|move| {avg_move:.1f}%")
-        elif avg_move >= 5:
-            score += 1; reasons.append(f"|move| {avg_move:.1f}%")
-        elif avg_move < 3:
-            score -= 1; reasons.append(f"|move| {avg_move:.1f}% quiet")
+    if avg_move is None:
+        return "⏭️ Skip", "no earnings-move history", 0
+    if avg_move < 3:
+        return "⏭️ Skip", f"too quiet (avg move {avg_move:.1f}%)", 0
+
+    score = 0
+    pros: list[str] = []
+    cons: list[str] = []
+    if avg_move >= 8:
+        score += 2; pros.append(f"avg move {avg_move:.1f}%")
+    elif avg_move >= 5:
+        score += 1; pros.append(f"avg move {avg_move:.1f}%")
 
     n = d.get("past_n") or 0
-    beat_rate = (d.get("beats") or 0) / n if n else 0
-    rev = d.get("revision_label") or ""
-    if n >= 3 and beat_rate >= 0.75 and "Bullish" in rev:
-        score += 2; reasons.append("beats + ↑ revs")
-    elif n >= 3 and (beat_rate <= 0.25 or "Cautious" in rev):
-        score -= 1
-        if beat_rate <= 0.25:
-            reasons.append(f"weak beat record")
-        if "Cautious" in rev:
-            reasons.append("↓ revs")
+    if n >= 3:
+        beat_rate = (d.get("beats") or 0) / n
+        if beat_rate >= 0.75:
+            score += 1; pros.append(f"beats {d['beats']}/{n}")
+        elif beat_rate <= 0.25:
+            score -= 1; cons.append("weak beat record")
 
-    du = d.get("days_until")
-    if du is not None and 1 <= du <= 5:
-        score += 1
+    rev_delta = d.get("revision_delta_pct")
+    if rev_delta is not None:
+        if rev_delta >= 2:
+            score += 1; pros.append("↑ revs")
+        elif rev_delta <= -2:
+            score -= 1; cons.append("↓ revs")
 
     if score >= 3:
         label = "🎯 Strong ER play"
-    elif score >= 1:
-        label = "🎲 Lottery — small size"
+    elif score == 2:
+        label = "🎲 Small-size ER play"
     else:
-        label = "⏭️  Skip"
-    return label, ", ".join(reasons) if reasons else "no edge"
+        label = "⏭️ Skip"
+    return label, _join_reasons(pros, cons), score
 
 
 def _revision_label(ticker_obj: yf.Ticker) -> tuple[Optional[str], Optional[float]]:
@@ -482,8 +498,8 @@ def _dossier_for_ticker(tk: str, cache: dict) -> Optional[dict]:
         "revision_label": rev_label,
         "revision_delta_pct": rev_delta,
     }
-    d["buy_verdict"], d["buy_reason"] = _buy_verdict(d)
-    d["play_verdict"], d["play_reason"] = _earnings_play_verdict(d)
+    d["buy_verdict"], d["buy_reason"], d["buy_score"] = _buy_verdict(d)
+    d["play_verdict"], d["play_reason"], d["play_score"] = _earnings_play_verdict(d)
     return d
 
 
@@ -512,52 +528,39 @@ def _fmt_date(d) -> str:
     return f"{months[d.month - 1]} {d.day} ({d.strftime('%a')})"
 
 
-def _render_card(d: dict) -> list[str]:
-    name = html.escape(d["name"])
-    sector = html.escape(d["sector"] or "—")
-    eps_s = f"${d['eps_est']:.2f}" if isinstance(d["eps_est"], (int, float)) and pd.notna(d["eps_est"]) else "—"
-    rev_s = _fmt_money(d["rev_est"])
-    analyst_s = f"{d['analyst_count']} analysts" if d.get("analyst_count") else ""
-    mkt_s = _fmt_money(d["market_cap"])
-    bm_s = f"{d['beats']}/{d['misses']}/{d['in_lines']} of {d['past_n']}"
-    avg_s = f"{d['avg_abs_move']:.1f}%" if d["avg_abs_move"] is not None else "—"
-    moves_s = ", ".join(f"{m:+.1f}%" for m in d["moves"]) if d["moves"] else "—"
+def _render_card(d: dict, held: bool) -> list[str]:
+    name = html.escape(d["name"][:28])
+    held_s = " · 💼 held" if held else ""
+    head = f"<b>{d['ticker']}</b> {name} · {_fmt_date(d['next_date'])} {d['bmo_amc']}{held_s}"
 
-    lines = []
-    lines.append(f"<b>{d['ticker']}</b> — {name} · {d['bmo_amc']}")
-    parts1 = [f"EPS est <b>{eps_s}</b>"]
-    if analyst_s:
-        parts1.append(analyst_s)
-    parts1.append(f"Rev est {rev_s}")
-    parts1.append(f"Mkt {mkt_s}")
-    parts1.append(sector)
-    lines.append("  " + " · ".join(parts1))
-
-    # Price / target / RSI line — only rendered when we have data
-    px_bits: list[str] = []
+    bits: list[str] = []
     if isinstance(d.get("price"), (int, float)):
-        px_bits.append(f"Px ${d['price']:.2f}")
-    if isinstance(d.get("target_mean"), (int, float)):
-        up = d.get("target_upside_pct")
-        up_s = f" ({up:+.0f}%)" if up is not None else ""
-        px_bits.append(f"Tgt ${d['target_mean']:.2f}{up_s}")
+        bits.append(f"${d['price']:.2f}")
+    up = d.get("target_upside_pct")
+    if up is not None:
+        bits.append(f"tgt {up:+.0f}%")
     if isinstance(d.get("rsi"), (int, float)):
-        px_bits.append(f"RSI {d['rsi']:.0f}")
-    if px_bits:
-        lines.append("  " + " · ".join(px_bits))
+        bits.append(f"RSI {d['rsi']:.0f}")
+    if d.get("past_n"):
+        bits.append(f"beats {d['beats']}/{d['past_n']}")
+    if d.get("avg_abs_move") is not None:
+        bits.append(f"avg move {d['avg_abs_move']:.1f}%")
+    if d.get("revision_delta_pct") is not None:
+        bits.append(f"revs {d['revision_delta_pct']:+.0f}%")
 
-    lines.append(f"  Beat record: <b>{bm_s}</b> · Avg ⎮move⎮ {avg_s}")
-    if d["moves"]:
-        lines.append(f"  Past 4 moves: {moves_s}")
-    if d["revision_label"]:
-        rev_delta = d["revision_delta_pct"]
-        rev_pct_s = f" ({rev_delta:+.1f}% vs 30d ago)" if rev_delta is not None else ""
-        lines.append(f"  {d['revision_label']}{rev_pct_s}")
-
-    # Verdicts — mechanical, from data
-    lines.append(f"  <b>{d['buy_verdict']}</b> at current — <i>{html.escape(d['buy_reason'])}</i>")
-    lines.append(f"  <b>{d['play_verdict']}</b> — <i>{html.escape(d['play_reason'])}</i>")
+    lines = [head, "  " + " · ".join(bits)]
+    lines.append(f"  <b>{d['buy_verdict']}</b> — <i>{html.escape(d['buy_reason'])}</i>")
+    if not d["play_verdict"].startswith("⏭️"):
+        lines.append(f"  <b>{d['play_verdict']}</b> — <i>{html.escape(d['play_reason'])}</i>")
     return lines
+
+
+def _held_tickers() -> set[str]:
+    try:
+        p = json.load(open(PORTFOLIO_FILE))
+        return {x["ticker"].upper() for x in p.get("positions", []) if x.get("ticker")}
+    except Exception:
+        return set()
 
 
 def build_earnings_spotlight_section() -> Optional[str]:
@@ -598,24 +601,32 @@ def build_earnings_spotlight_section() -> Optional[str]:
     if not dossiers:
         return None
 
-    dossiers.sort(key=lambda x: (x["next_date"], x["ticker"]))
+    held = _held_tickers()
+    mine = [d for d in dossiers if d["ticker"] in held]
+    # Only surface outside names with something actionable on either verdict.
+    others = [d for d in dossiers
+              if d["ticker"] not in held and (d["buy_score"] >= 2 or d["play_score"] >= 2)]
+    others.sort(key=lambda x: (-(x["buy_score"] + x["play_score"]), -x["market_cap"]))
+    picks = others[:MAX_IDEAS]
+    shown = {d["ticker"] for d in mine + picks}
+    rest = sorted(d["ticker"] for d in dossiers if d["ticker"] not in shown)
 
     lines = [f"<b>📈 Earnings Spotlight — next {HORIZON_DAYS} days</b>"]
-    lines.append(f"  <i>S&amp;P 500 ∪ portfolio, market cap ≥ {_fmt_money(MIN_MARKET_CAP)}</i>")
+    lines.append(f"  <i>{len(dossiers)} reporting (S&amp;P 500 ∪ portfolio ∪ extras, ≥ "
+                 f"{_fmt_money(MIN_MARKET_CAP)}) · showing your holdings + top {len(picks)} setups</i>")
 
-    cur_date = None
-    for d in dossiers:
-        if d["next_date"] != cur_date:
-            cur_date = d["next_date"]
-            lines.append("")
-            lines.append(f"<b>📅 {_fmt_date(cur_date)}</b>")
+    for d in sorted(mine, key=lambda x: x["next_date"]) + sorted(picks, key=lambda x: x["next_date"]):
         lines.append("")
-        lines.extend(_render_card(d))
+        lines.extend(_render_card(d, d["ticker"] in held))
+
+    if rest:
+        lines.append("")
+        lines.append(f"<i>Also reporting, no clear setup: {', '.join(rest)}</i>")
 
     lines.append("")
     lines.append(
-        "<i>Verdicts are mechanical from data (target upside, revisions, RSI, "
-        "beat rate, historical earnings-day move) — not editorial. Sanity-check before acting.</i>"
+        "<i>Verdicts are mechanical (target upside, revisions, RSI, beat rate, avg earnings-day move). "
+        "BUY needs ≥2 confirming signals beyond upside. Sanity-check before acting.</i>"
     )
     return "\n".join(lines)
 
