@@ -5028,5 +5028,49 @@
       "reported_eps": 0.69,
       "surprise_pct": 3.95
     }
+  ],
+  "FIX": [
+    {
+      "date": "2026-07-23T16:00:00-04:00",
+      "reported_eps": 12.53,
+      "surprise_pct": 19.85
+    },
+    {
+      "date": "2026-04-23T16:00:00-04:00",
+      "reported_eps": 10.51,
+      "surprise_pct": 54.44
+    },
+    {
+      "date": "2026-02-19T16:00:00-05:00",
+      "reported_eps": 9.37,
+      "surprise_pct": 38.71
+    },
+    {
+      "date": "2025-10-23T16:00:00-04:00",
+      "reported_eps": 8.25,
+      "surprise_pct": 31.26
+    }
+  ],
+  "OMC": [
+    {
+      "date": "2026-07-28T16:00:00-04:00",
+      "reported_eps": 2.65,
+      "surprise_pct": -0.39
+    },
+    {
+      "date": "2026-04-28T16:00:00-04:00",
+      "reported_eps": 1.9,
+      "surprise_pct": 3.13
+    },
+    {
+      "date": "2026-02-18T16:00:00-05:00",
+      "reported_eps": 2.59,
+      "surprise_pct": -11.8
+    },
+    {
+      "date": "2025-10-21T16:00:00-04:00",
+      "reported_eps": 2.24,
+      "surprise_pct": 3.06
+    }
   ]
 }
