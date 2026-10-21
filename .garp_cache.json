@@ -2,51 +2,51 @@
   "entries": {
     "ADBE": {
       "values": {
-        "tPE": 13.304232,
-        "fPE": 8.662302,
+        "tPE": 14.247627,
+        "fPE": 9.276541,
         "DE": 57.693,
         "EPSg": 0.105,
-        "PEG": 0.57,
-        "MCap": 92738109440,
+        "PEG": 0.59,
+        "MCap": 99314114560,
         "sector": "Technology"
       },
-      "cached_at": 1792001083
+      "cached_at": 1792606139
     },
     "AMZN": {
       "values": {
-        "tPE": 20.385357,
-        "fPE": 24.239103,
+        "tPE": 21.234917,
+        "fPE": 25.274942,
         "DE": 45.617,
         "EPSg": 2.423,
-        "PEG": 1.5,
-        "MCap": 2733144014848,
+        "PEG": 1.45,
+        "MCap": 2847047417856,
         "sector": "Consumer Cyclical"
       },
-      "cached_at": 1792001083
+      "cached_at": 1792606139
     },
     "AVGO": {
       "values": {
-        "tPE": 44.103447,
-        "fPE": 17.806187,
+        "tPE": 43.242657,
+        "fPE": 17.455837,
         "DE": 59.604,
         "EPSg": 2.153,
-        "PEG": 0.35,
-        "MCap": 1648477601792,
+        "PEG": 0.33,
+        "MCap": 1616303357952,
         "sector": "Technology"
       },
-      "cached_at": 1792001083
+      "cached_at": 1792606139
     },
     "BLSH": {
       "values": {
         "tPE": null,
-        "fPE": 41.710342,
+        "fPE": 41.539154,
         "DE": 21.063,
         "EPSg": null,
         "PEG": null,
-        "MCap": 4585846272,
+        "MCap": 4487275008,
         "sector": "Technology"
       },
-      "cached_at": 1792001083
+      "cached_at": 1792606140
     },
     "BTGO": {
       "values": {
@@ -63,170 +63,170 @@
     "COIN": {
       "values": {
         "tPE": null,
-        "fPE": 57.185947,
+        "fPE": 60.49415,
         "DE": 50.982,
         "EPSg": null,
-        "PEG": 2.46,
-        "MCap": 45416890368,
+        "PEG": 2.37,
+        "MCap": 47453708288,
         "sector": "Financial Services"
       },
-      "cached_at": 1792001084
+      "cached_at": 1792606140
     },
     "CRWD": {
       "values": {
-        "tPE": 4190.3335,
-        "fPE": 156.20999,
+        "tPE": 4028.5833,
+        "fPE": 150.01892,
         "DE": 15.958,
         "EPSg": null,
-        "PEG": 6.74,
-        "MCap": 257437696000,
+        "PEG": 5.87,
+        "MCap": 247500406784,
         "sector": "Technology"
       },
-      "cached_at": 1792001084
+      "cached_at": 1792606140
     },
     "CRWV": {
       "values": {
         "tPE": null,
-        "fPE": -35.284557,
+        "fPE": -33.74361,
         "DE": 1027.329,
         "EPSg": null,
         "PEG": null,
-        "MCap": 35678904320,
+        "MCap": 34368999424,
         "sector": "Technology"
       },
-      "cached_at": 1792001084
+      "cached_at": 1792606141
     },
     "GOOG": {
       "values": {
-        "tPE": 17.239336,
-        "fPE": 22.427258,
+        "tPE": 16.587963,
+        "fPE": 21.540466,
         "DE": 18.859,
         "EPSg": 2.94,
-        "PEG": 1.23,
-        "MCap": 4201960964096,
+        "PEG": 1.18,
+        "MCap": 4043193450496,
         "sector": "Communication Services"
       },
-      "cached_at": 1792001085
+      "cached_at": 1792606141
     },
     "IREN": {
       "values": {
         "tPE": null,
-        "fPE": -7.694645,
+        "fPE": -7.0618987,
         "DE": 187.297,
         "EPSg": null,
         "PEG": 3.11,
-        "MCap": 12075927552,
+        "MCap": 11082899456,
         "sector": "Financial Services"
       },
-      "cached_at": 1792001085
+      "cached_at": 1792606141
     },
     "MSFT": {
       "values": {
-        "tPE": 30.112112,
-        "fPE": 22.577013,
+        "tPE": 29.677158,
+        "fPE": 22.478132,
         "DE": 29.118,
         "EPSg": 0.317,
-        "PEG": 1.76,
-        "MCap": 3968879820800,
+        "PEG": 1.72,
+        "MCap": 3955625558016,
         "sector": "Technology"
       },
-      "cached_at": 1792001085
+      "cached_at": 1792606142
     },
     "NFLX": {
       "values": {
-        "tPE": 22.083332,
-        "fPE": 18.472776,
-        "DE": 55.236,
-        "EPSg": 0.111,
+        "tPE": 18.966763,
+        "fPE": 17.373566,
+        "DE": 51.671,
+        "EPSg": 0.482,
         "PEG": 1.21,
-        "MCap": 292412653568,
+        "MCap": 273258528768,
         "sector": "Communication Services"
       },
-      "cached_at": 1792001085
+      "cached_at": 1792606142
     },
     "NOW": {
       "values": {
-        "tPE": 87.09317,
-        "fPE": 28.01313,
+        "tPE": 95.59375,
+        "fPE": 30.549307,
         "DE": 67.538,
         "EPSg": -0.219,
-        "PEG": 1.0,
-        "MCap": 144968138752,
+        "PEG": 1.02,
+        "MCap": 158129192960,
         "sector": "Technology"
       },
-      "cached_at": 1792001086
+      "cached_at": 1792606142
     },
     "NVDA": {
       "values": {
-        "tPE": 27.90139,
-        "fPE": 13.867768,
+        "tPE": 28.0,
+        "fPE": 13.91678,
         "DE": 16.971,
         "EPSg": 1.278,
-        "PEG": 0.28,
-        "MCap": 5329242816512,
+        "PEG": 0.26,
+        "MCap": 5348077338624,
         "sector": "Technology"
       },
-      "cached_at": 1792001086
+      "cached_at": 1792606142
     },
     "RDDT": {
       "values": {
-        "tPE": 34.869766,
-        "fPE": 15.486837,
+        "tPE": 36.13188,
+        "fPE": 16.047384,
         "DE": 0.635,
         "EPSg": 1.778,
-        "PEG": 0.8,
-        "MCap": 28847933440,
+        "PEG": 0.78,
+        "MCap": 29892087808,
         "sector": "Communication Services"
       },
-      "cached_at": 1792001086
+      "cached_at": 1792606143
     },
     "SE": {
       "values": {
-        "tPE": 36.53282,
-        "fPE": 18.165796,
+        "tPE": 30.048262,
+        "fPE": 14.941376,
         "DE": 31.621,
         "EPSg": 0.077,
-        "PEG": 0.92,
-        "MCap": 57953288192,
+        "PEG": 0.9,
+        "MCap": 47666606080,
         "sector": "Consumer Cyclical"
       },
-      "cached_at": 1792001087
+      "cached_at": 1792606143
     },
     "SNOW": {
       "values": {
         "tPE": null,
-        "fPE": 113.08066,
+        "fPE": 107.47275,
         "DE": 128.57,
         "EPSg": null,
-        "PEG": 6.41,
-        "MCap": 119892017152,
+        "PEG": 5.5,
+        "MCap": 114526814208,
         "sector": "Technology"
       },
-      "cached_at": 1792001087
+      "cached_at": 1792606143
     },
     "TEAM": {
       "values": {
         "tPE": null,
-        "fPE": 30.391306,
+        "fPE": 33.52689,
         "DE": 116.483,
         "EPSg": null,
-        "PEG": 2.16,
-        "MCap": 51840294912,
+        "PEG": 2.17,
+        "MCap": 57206841344,
         "sector": "Technology"
       },
-      "cached_at": 1792001087
+      "cached_at": 1792606144
     },
     "TSM": {
       "values": {
-        "tPE": 31.222383,
-        "fPE": 19.250492,
-        "DE": 16.504,
-        "EPSg": 0.774,
-        "PEG": 0.84,
-        "MCap": 2228212989952,
+        "tPE": 27.86779,
+        "fPE": 18.387627,
+        "DE": 11.619,
+        "EPSg": 0.687,
+        "PEG": 0.75,
+        "MCap": 2230183788544,
         "sector": "Technology"
       },
-      "cached_at": 1792001087
+      "cached_at": 1792606144
     },
     "AAPL": {
       "values": {
