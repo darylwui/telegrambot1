@@ -28,50 +28,50 @@ STRIKES = {
 THESES = {
     "AMZN": {
         "bull": (
-            "AWS growing 24% YoY on a $142B annualized run rate with a $244B backlog "
-            "(up 40% YoY); Bedrock AI spend grew 60% QoQ. Q1 2026 earnings April 29, "
-            "operating income guided $16.5–21.5B."
+            "AWS re-accelerated for a fifth straight quarter to +37% YoY ($42.2B) in Q2 2026, "
+            "with backlog at $496B and growing triple digits; group revenue +20% to $200.6B, "
+            "operating income +43%. Q3 2026 earnings Oct 29 (guided $197–202B revenue)."
         ),
         "bear": (
-            "$200B capex plan pressures near-term FCF; tariffs on imported goods and "
-            "consumer spending softness threaten the retail segment; elevated valuation "
-            "leaves limited downside cushion."
+            "2026 capex raised to ~$220B (from ~$200B) as memory costs climb — FCF stays "
+            "under pressure; AWS is capacity-constrained, so growth depends on getting new "
+            "data centres online; retail still exposed to tariffs and consumer softness."
         ),
     },
     "GOOG": {
         "bull": (
-            "Alphabet crossed $400B in annual revenue in 2025; Google Cloud growing "
-            "~48% YoY; Q1 2026 earnings April 29 expected to beat as AI monetization "
-            "scales across Search and Cloud."
+            "Google Cloud revenue +82% YoY to $24.8B in Q2 2026 with a 35.6% operating margin "
+            "and $514B backlog; group revenue +24% to $119.8B. Q3 2026 earnings Oct 28 — "
+            "watch whether Cloud growth holds above 70%."
         ),
         "bear": (
-            "DOJ antitrust remedies could unwind lucrative default-search distribution "
-            "deals; $175–$185B 2026 capex more than doubles prior-year spend; "
-            "OpenAI and Perplexity intensifying competition in AI-driven search."
+            "2026 capex guidance lifted to $195–205B and management expects a significant "
+            "further increase in 2027; Q2 free cash flow turned negative (−$5.9B); "
+            "AI chat assistants keep chipping at traditional Search usage."
         ),
     },
     "META": {
         "bull": (
-            "Q1 2026 revenue guidance $53.5–$56.5B reflects AI-powered ad growth "
-            "accelerating to ~24% YoY; Advantage+ automation and Reels continue to "
-            "lift advertiser ROI; PayPal partnership expands commerce footprint."
+            "Q3 2026 (reported Oct 21) revenue +26% YoY to $64.6B, and Q4 guided to "
+            "$73–76B, above consensus — AI-driven ad targeting is still lifting pricing "
+            "and volume. Ex-legal charge, 2026 operating income tracking above 2025."
         ),
         "bear": (
-            "$115–$135B 2026 capex nearly doubles 2025 spend and will pressure FCF "
-            "for multiple quarters; Reality Labs operating losses persist; "
-            "macro headwinds from tariffs could soften H2 ad budgets."
+            "A $9.9B youth-mental-health settlement hit Q3 profit; 2026 capex narrowed up "
+            "to $135–145B with Q3 alone at $34.9B; Reality Labs still losing $18–19B "
+            "this year. Next earnings late January."
         ),
     },
     "NVDA": {
         "bull": (
-            "Blackwell GPUs drove ~70% of data center compute revenue with 69% YoY "
-            "total revenue growth; sovereign AI demand and hyperscaler capex buildouts "
-            "sustaining structural GPU demand."
+            "Q2 FY2027 revenue +106% YoY to $96.2B, data centre +117% to $89.0B, gross "
+            "margin 75%; Q3 guided to $108B (above ~$104B consensus) and management is "
+            "targeting ~70% growth in FY2028. Q3 earnings expected Nov 17."
         ),
         "bear": (
-            "Export restrictions expected to cost ~$8B in H20 revenue in Q2 FY2027; "
-            "prior $4.5B H20 charge already compressed gross margin to 61%; "
-            "further escalation of chip export controls to China is a direct earnings risk."
+            "Guidance assumes zero China data-centre revenue, so policy remains a swing "
+            "factor; hyperscalers are ~55% of data-centre sales — any capex digestion "
+            "hits directly; rising memory costs are a margin watch-point."
         ),
     },
 }

@@ -1,14 +1,14 @@
 MACRO = {
     "risks": [
-        "Fed holds rates at 4.25–4.50%; market pricing ~3 cuts by end-2026 — any hawkish pivot reprices growth stocks sharply.",
-        "US–China tariffs (145% on Chinese goods, 125% retaliatory) threaten hardware supply chains and inflate cost bases.",
-        "Recession probability elevated (~45% per major banks) as ISM manufacturing contracts and consumer confidence weakens.",
-        "Dollar weakening (DXY -8% YTD) supports multinational USD revenue but signals broader macro stress.",
+        "Fed hiked to 3.75–4.00% in September (first hike since 2023); markets price a hold on Oct 28 but lean toward another hike in December — higher-for-longer pressures growth multiples.",
+        "10-year Treasury yield ~5.15%, near cycle highs — the main headwind for long-duration tech valuations.",
+        "AI-valuation wobble in Asia: Samsung, SK Hynix and SoftBank sold off on AI-bubble and AI-financing worries — a read-through risk for NVDA and hyperscaler capex names.",
+        "Strait of Hormuz conflict keeps oil volatile (WTI ~$98 after touching five-month highs) — an energy-driven inflation spike would harden rate-hike bets.",
     ],
     "watch": [
-        "Apr 29: AMZN + GOOG Q1 earnings — bellwether for cloud/AI spend and ad market health.",
-        "Apr 30: Q1 US GDP first estimate — contraction would trigger broad risk-off.",
-        "May FOMC: Fed rate decision — guidance on inflation vs. growth trade-off.",
-        "US–China trade talks: Any tariff de-escalation is a major upside catalyst for NVDA and AMZN.",
+        "Oct 28: FOMC decision — hold expected; the tone on a December hike matters more than the decision.",
+        "Oct 28: GOOG + MSFT, Oct 29: AMZN Q3 earnings — 2027 capex guidance is the key read on AI spend (META already reported Oct 21).",
+        "Nov 6: October jobs report, Nov 10: October CPI — both feed the December rate decision.",
+        "Nov 17 (expected): NVDA Q3 FY2027 earnings — the clearest check on whether AI chip demand is holding up.",
     ],
 }
