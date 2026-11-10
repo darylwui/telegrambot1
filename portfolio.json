@@ -5,7 +5,7 @@
     {"ticker": "AMZN", "shares": 50,  "cost": 183.389},
     {"ticker": "AVGO", "shares": 30,  "cost": 319.05},
     {"ticker": "BLSH", "shares": 200, "cost": 37.875},
-    {"ticker": "COIN", "shares": 300, "cost": 214.312},
+    {"ticker": "COIN", "shares": 200, "cost": 213.361},
     {"ticker": "CRWD", "shares": 50,  "cost": -68.0},
     {"ticker": "CRWV", "shares": 70,  "cost": 75.9},
     {"ticker": "GOOG", "shares": 40,  "cost": 240.538},
