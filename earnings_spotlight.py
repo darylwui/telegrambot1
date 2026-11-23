@@ -563,12 +563,12 @@ def _held_tickers() -> set[str]:
         return set()
 
 
-def build_earnings_spotlight_section() -> Optional[str]:
-    """Top-level entry. Returns rendered HTML section or None if nothing qualifies."""
+def scan_dossiers() -> list[dict]:
+    """Scan the universe and return dossiers for names reporting inside the horizon."""
     universe = _load_universe()
     if not universe:
         print("[spotlight] empty universe; section skipped")
-        return None
+        return []
 
     cache = _load_cache()
     cache_size_before = sum(1 for v in cache.values() if v)
@@ -598,6 +598,12 @@ def build_earnings_spotlight_section() -> Optional[str]:
 
     print(f"[spotlight] {len(dossiers)} qualified for next {HORIZON_DAYS}d window "
           f"(scanned {len(universe)}, errors {errors})")
+    return dossiers
+
+
+def build_earnings_spotlight_section() -> Optional[str]:
+    """Top-level entry. Returns rendered HTML section or None if nothing qualifies."""
+    dossiers = scan_dossiers()
     if not dossiers:
         return None
 
@@ -630,6 +636,98 @@ def build_earnings_spotlight_section() -> Optional[str]:
     )
     return "\n".join(lines)
 
+
+# ── Tiered view (used by the Portfolio Watch message) ──
+
+TIER_GOOD = "good"    # buy signal + big, reliable earnings move
+TIER_SMALL = "small"  # decent setup, smaller or less reliable move
+TIER_WATCH = "watch"  # something on one verdict, no clear edge
+
+
+def _tier(d: dict) -> Optional[str]:
+    buy, play = d["buy_score"], d["play_score"]
+    if buy >= 2 and play >= 3:
+        return TIER_GOOD
+    if buy >= 4 or (buy >= 2 and play >= 2):
+        return TIER_SMALL
+    if buy >= 2 or play >= 2:
+        return TIER_WATCH
+    return None
+
+
+def _session_label(bmo_amc: str) -> str:
+    s = (bmo_amc or "").upper()
+    if s == "BMO":
+        return "before open"
+    if s == "AMC":
+        return "after close"
+    return s.lower()
+
+
+def _tier_line(d: dict) -> str:
+    when = f"{d['next_date'].strftime('%a')} {d['next_date'].day} {d['next_date'].strftime('%b')}"
+    sess = _session_label(d.get("bmo_amc"))
+    bits = []
+    up = d.get("target_upside_pct")
+    if up is not None:
+        bits.append(f"target {up:+.0f}%")
+    if isinstance(d.get("rsi"), (int, float)) and d["rsi"] < 30:
+        bits.append("oversold")
+    if d.get("past_n"):
+        bits.append(f"beat {d['beats']} of last {d['past_n']}")
+    if d.get("avg_abs_move") is not None:
+        bits.append(f"avg move {d['avg_abs_move']:.0f}%")
+    head = f"<b>{d['ticker']}</b> · {when}" + (f" {sess}" if sess else "")
+    return f"   → {head} · {', '.join(bits)}"
+
+
+def build_earnings_tiers_section(holdings_calendar: Optional[list] = None) -> Optional[str]:
+    """Earnings grouped by how good a play they look.
+
+    holdings_calendar is portfolio_report's [(date, [tickers])] list of your
+    own holdings reporting soon; it gets its own line at the bottom.
+    """
+    dossiers = scan_dossiers()
+    held = _held_tickers()
+    others = [d for d in dossiers if d["ticker"] not in held]
+
+    tiers: dict[str, list[dict]] = {TIER_GOOD: [], TIER_SMALL: [], TIER_WATCH: []}
+    quiet: list[str] = []
+    for d in others:
+        t = _tier(d)
+        if t:
+            tiers[t].append(d)
+        else:
+            quiet.append(d["ticker"])
+    for t in (TIER_GOOD, TIER_SMALL):
+        tiers[t].sort(key=lambda x: (x["next_date"], -(x["buy_score"] + x["play_score"])))
+        del tiers[t][MAX_IDEAS:]
+
+    if not dossiers and not holdings_calendar:
+        return None
+
+    lines = [f"📅 <b><u>Earnings to Take Note Of</u></b> <i>— next {HORIZON_DAYS} days</i>"]
+    if tiers[TIER_GOOD]:
+        lines.append("🎯 <b>Good plays</b> <i>(buy signal + big, reliable earnings move)</i>")
+        lines.extend(_tier_line(d) for d in tiers[TIER_GOOD])
+    if tiers[TIER_SMALL]:
+        lines.append("🟢 <b>Worth a small position</b> <i>(decent setup, smaller move)</i>")
+        lines.extend(_tier_line(d) for d in tiers[TIER_SMALL])
+    watch = sorted(d["ticker"] for d in tiers[TIER_WATCH])
+    if watch or quiet:
+        lines.append("⚪ <b>Watch only</b> <i>(no clear edge)</i>")
+        tail = ", ".join(watch)
+        if quiet:
+            tail += (" · " if tail else "") + "also reporting: " + ", ".join(sorted(quiet))
+        lines.append(f"   → {tail}")
+    if not any(tiers.values()) and not quiet:
+        lines.append("<i>No large-cap earnings in the next week.</i>")
+
+    if holdings_calendar:
+        parts = [f"{', '.join(tks)} {dt.strftime('%a')} {dt.day} {dt.strftime('%b')}"
+                 for dt, tks in holdings_calendar]
+        lines.append(f"💼 <b>Your holdings:</b> {' · '.join(parts)}")
+    return "\n".join(lines)
 
 if __name__ == "__main__":
     out = build_earnings_spotlight_section()

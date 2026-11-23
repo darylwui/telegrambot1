@@ -101,6 +101,7 @@ def build_diagnostics_section(
     portfolio: dict,
     prices: dict,
     history: Optional[pd.DataFrame] = None,
+    include_leaderboard: bool = True,
 ) -> Optional[str]:
     """
     Render the diagnostics section. portfolio is the parsed portfolio.json,
@@ -136,19 +137,20 @@ def build_diagnostics_section(
     # (Concentration is intentionally NOT shown here — at-a-glance alerts
     # already surface single-name + cluster concentration warnings, and
     # showing them twice is noise.)
-    worst, best = _drawdown_leaderboard(rows)
-    lines.append("")
-    lines.append("<b>P/L leaders + laggards</b>")
-    for r in best:
-        lines.append(
-            f"  📈 <b>{r['ticker']}</b> {r['pnl_pct']:+.1f}% "
-            f"({r['pnl']:+,.0f})"
-        )
-    for r in worst:
-        lines.append(
-            f"  📉 <b>{r['ticker']}</b> {r['pnl_pct']:+.1f}% "
-            f"({r['pnl']:+,.0f})"
-        )
+    if include_leaderboard:
+        worst, best = _drawdown_leaderboard(rows)
+        lines.append("")
+        lines.append("<b>P/L leaders + laggards</b>")
+        for r in best:
+            lines.append(
+                f"  📈 <b>{r['ticker']}</b> {r['pnl_pct']:+.1f}% "
+                f"({r['pnl']:+,.0f})"
+            )
+        for r in worst:
+            lines.append(
+                f"  📉 <b>{r['ticker']}</b> {r['pnl_pct']:+.1f}% "
+                f"({r['pnl']:+,.0f})"
+            )
 
     # Correlation pairs
     # (Sector mix is intentionally NOT shown here — Cluster exposure
@@ -170,7 +172,8 @@ def build_diagnostics_section(
 
     lines.append("")
     lines.append(
-        "<i>Diagnostics: P/L leaderboard + 60-day return correlation. "
+        "<i>Diagnostics: 60-day return correlation"
+        + (" + P/L leaderboard" if include_leaderboard else "") + ". "
         "Not trim/exit/add calls — you decide what to do with the info. "
         "(Concentration alerts at the top; sector grouping is in "
         "Cluster exposure earlier.)</i>"

@@ -43,9 +43,9 @@ except Exception as _e:
     print(f"diagnostics unavailable: {_e}")
 
 try:
-    from earnings_spotlight import build_earnings_spotlight_section
+    from earnings_spotlight import build_earnings_tiers_section
 except Exception as _e:
-    build_earnings_spotlight_section = None
+    build_earnings_tiers_section = None
     print(f"earnings_spotlight unavailable: {_e}")
 
 BOT_TOKEN = os.environ.get("PORTFOLIO_BOT_TOKEN", "")
@@ -141,67 +141,6 @@ def compute_indicators(history: pd.DataFrame, ticker: str) -> dict:
         pass
 
     return out
-
-
-def compute_entry_levels(px: float, ind: dict, analyst_target: Optional[float]) -> dict:
-    """Derive entry zone, stop, and take-profit from pre-computed indicators."""
-    sma20  = ind.get("sma20")
-    sma50  = ind.get("sma50")
-    sma200 = ind.get("sma200")
-    rsi    = ind.get("rsi") or 50
-    atr    = ind.get("atr14") or px * 0.02   # fallback: 2% of price
-    high52 = ind.get("high52w") or px
-
-    screen = el = eh = st = None
-
-    if sma200 and px > sma200 and rsi < 35 and sma50 and abs(px / sma50 - 1) <= 0.05:
-        screen = "oversold pullback"
-        el, eh = px - 0.25 * atr, px + 0.25 * atr
-        st = sma200 * 0.98
-    elif sma200 and sma20 and sma50 and sma20 > sma50 > sma200 and 55 <= rsi <= 70 and px > sma20:
-        screen = "momentum"
-        el, eh = sma20 * 0.99, sma20 * 1.015
-        st = sma50 * 0.98
-    elif px >= high52 * 0.99:
-        screen = "breakout"
-        el, eh = high52 * 0.99, high52 * 1.01
-        st = high52 * 0.95
-    elif sma200 and px > sma200 and 40 < rsi < 55 and sma50:
-        screen = "uptrend cooling"
-        el, eh = sma50 * 0.99, sma50 * 1.01
-        st = sma200 * 0.98
-    elif rsi > 75 and sma20 and px > sma20 * 1.10:
-        screen = "extended"
-        el, eh = px - 0.25 * atr, px + 0.25 * atr
-        st = px + 1.5 * atr   # short stop above price
-    else:
-        screen = "no clean setup"
-        el, eh = px - 0.5 * atr, px + 0.5 * atr
-        st = px - 1.5 * atr
-
-    entry_mid = (el + eh) / 2
-    risk = abs(entry_mid - st)
-
-    # Take profit: analyst target if above entry zone, else 2R
-    tp = tp_source = None
-    if analyst_target and analyst_target > eh and screen != "extended":
-        tp = round(float(analyst_target), 2)
-        tp_source = "analyst PT"
-    elif risk > 0 and screen != "extended":
-        tp = round(entry_mid + 2 * risk, 2)
-        tp_source = "2R"
-
-    upside = round((tp / px - 1) * 100, 1) if tp else None
-
-    return {
-        "screen": screen,
-        "entry_low":  round(el, 2),
-        "entry_high": round(eh, 2),
-        "stop":       round(st, 2),
-        "tp":         tp,
-        "tp_source":  tp_source,
-        "upside":     upside,
-    }
 
 
 def _pick_news_fields(item: dict) -> tuple:
@@ -379,77 +318,6 @@ def append_snapshot(state: dict, date_str: str, session: str, prices: dict, tota
     })
 
 
-def compute_streak_and_delta(state: dict, ticker: str, current_px: float, shares: int) -> dict:
-    """7-day P/L delta and consecutive up/down session streak.
-
-    Walks the snapshot history (PM-preferred per date), finds the entry from
-    closest to 7 calendar days ago, and counts consecutive up/down sessions
-    going backwards from today.
-    """
-    out = {"delta_7d": None, "delta_pct_7d": None, "streak": None, "streak_dir": None}
-    snaps = state.get("snapshots", [])
-    if not snaps:
-        return out
-
-    # Build daily series (one entry per date, prefer PM)
-    daily = {}
-    for s in snaps:
-        d = s.get("date")
-        px = s.get("prices", {}).get(ticker)
-        if px is None:
-            continue
-        if d not in daily or s.get("session") == "PM":
-            daily[d] = px
-    sorted_dates = sorted(daily.keys())
-    if not sorted_dates:
-        return out
-
-    # 7-day delta
-    today = datetime.date.today()
-    target = today - datetime.timedelta(days=7)
-    chosen = None
-    for d in reversed(sorted_dates):
-        try:
-            dd = datetime.date.fromisoformat(d)
-        except Exception:
-            continue
-        if dd <= target:
-            chosen = d
-            break
-    if chosen is None and sorted_dates:
-        chosen = sorted_dates[0]
-    if chosen:
-        old_px = daily[chosen]
-        out["delta_7d"] = round((current_px - old_px) * shares, 0)
-        if old_px:
-            out["delta_pct_7d"] = round((current_px - old_px) / old_px * 100, 1)
-
-    # Streak — walk backward through close-to-close daily prices
-    if len(sorted_dates) >= 2:
-        last_dir = None
-        streak = 0
-        prev_px = current_px
-        for d in reversed(sorted_dates):
-            px = daily[d]
-            if px is None:
-                continue
-            if px == prev_px:
-                break
-            this_dir = "up" if prev_px > px else "down"
-            if last_dir is None:
-                last_dir = this_dir
-                streak = 1
-            elif this_dir == last_dir:
-                streak += 1
-            else:
-                break
-            prev_px = px
-        if last_dir and streak >= 2:
-            out["streak"] = streak
-            out["streak_dir"] = last_dir
-    return out
-
-
 # ─────────────────────────────────────────────────────────────────────────────
 # ANALYSIS LAYER
 # ─────────────────────────────────────────────────────────────────────────────
@@ -601,93 +469,9 @@ def score_position(px, target_mean, pnl_pct, rating_score, portfolio_pct, rsi, e
     return "HOLD", "Balanced"
 
 
-def synthesize_read(ticker: str, px: float, ind: dict, snap: dict, brief_line: Optional[str]) -> list[str]:
-    """1–3 line read combining technicals, analyst view, and brief mention."""
-    lines = []
-
-    tech_parts = []
-    if ind.get("rsi") is not None:
-        rsi = ind["rsi"]
-        tag = ""
-        if rsi >= 75:
-            tag = " (overbought)"
-        elif rsi <= 30:
-            tag = " (oversold)"
-        tech_parts.append(f"RSI {rsi}{tag}")
-    if ind.get("sma20") and px:
-        diff = (px - ind["sma20"]) / ind["sma20"] * 100
-        sign = "+" if diff >= 0 else ""
-        tech_parts.append(f"SMA20 ${ind['sma20']:.0f} ({sign}{diff:.0f}%)")
-    if ind.get("sma200") and px and ind.get("sma20") and ind.get("sma50"):
-        if ind["sma20"] > ind["sma50"] > ind["sma200"]:
-            tech_parts.append("trend up")
-        elif ind["sma20"] < ind["sma50"] < ind["sma200"]:
-            tech_parts.append("trend down")
-    if tech_parts:
-        lines.append("📖 " + " · ".join(tech_parts))
-
-    if snap.get("analyst"):
-        lines.append("🧠 " + snap["analyst"])
-
-    if brief_line:
-        # Compact and HTML-escape
-        safe = html.escape(brief_line)
-        lines.append("📝 Brief: " + safe)
-
-    return lines
-
-
-def synthesize_playbook(
-    ticker: str, bucket: str, reason: str, px: float, cost: float, ind: dict, snap: dict
-) -> str:
-    """1-line playbook action with computed stop level."""
-    target = snap.get("target_mean")
-    lv = compute_entry_levels(px, ind, target)
-    stop = lv.get("stop")
-
-    if bucket == "TRIM":
-        if stop and cost > 0:
-            buf = (stop - cost) / cost * 100
-            buf_sign = "+" if buf >= 0 else ""
-            return f"▶ Trim 25% · trail stop ${stop:.2f} ({buf_sign}{buf:.0f}% vs ${cost:.2f} cost)"
-        if stop:
-            return f"▶ Trim 25% · trail stop ${stop:.2f} (house money)"
-        return f"▶ Trim 25% — {reason}"
-
-    if bucket == "BUY":
-        if target and px:
-            return f"▶ Add on weakness · street PT ${target:.0f} ({((target-px)/px*100):+.0f}%) · stop ${stop:.2f}" if stop else f"▶ Add on weakness · street PT ${target:.0f}"
-        return f"▶ Accumulate — {reason}"
-
-    if bucket == "EXIT":
-        return f"▶ Re-validate thesis or exit — {reason}"
-
-    # HOLD
-    if reason.startswith("Add blocked"):
-        stop_str = f" · stop ${stop:.2f}" if stop else ""
-        return f"▶ Hold — {reason}{stop_str}"
-    if cost <= 0:
-        stop_str = f" · stop ${stop:.2f}" if stop else ""
-        return f"▶ Hold{stop_str} · house money"
-    if cost and px:
-        gap = (px - cost) / cost * 100
-        sign = "+" if gap >= 0 else ""
-        stop_str = f" · stop ${stop:.2f}" if stop else ""
-        return f"▶ Hold{stop_str} · cost ${cost:.2f} ({sign}{gap:.0f}% from px)"
-    return f"▶ Hold — {reason}"
-
-
 # ─────────────────────────────────────────────────────────────────────────────
 # MESSAGE LAYER
 # ─────────────────────────────────────────────────────────────────────────────
-
-BUCKET_META = {
-    "TRIM": ("🔻", "Trim / risk-down"),
-    "EXIT": ("🚫", "Exit / re-validate"),
-    "BUY": ("🟢", "Add candidates"),
-    "HOLD": ("⏸", "Hold steady"),
-}
-
 
 def fetch_vix() -> Optional[dict]:
     """Fetch VIX level, prior close, delta, regime label, and (at extremes) an
@@ -793,13 +577,6 @@ def fetch_yield_10y() -> Optional[dict]:
     return {"level": last, "delta_bps": delta_bps, "extra": extra}
 
 
-def render_yield_line(y: Optional[dict]) -> Optional[str]:
-    if not y: return None
-    bps = round(y["delta_bps"]) + 0  # +0 turns -0 into 0
-    sd = "+" if bps >= 0 else ""
-    return f"💰 <b>10Y</b> {y['level']:.2f}% ({sd}{bps}bps) · {y['extra']}"
-
-
 def fetch_dxy() -> Optional[dict]:
     """DXY dollar index with delta % and regime interpretation."""
     try:
@@ -824,12 +601,6 @@ def fetch_dxy() -> Optional[dict]:
         extra = "dollar stable — no FX-driven adjustment needed"
 
     return {"level": last, "delta": delta, "delta_pct": delta_pct, "extra": extra}
-
-
-def render_dxy_line(d: Optional[dict]) -> Optional[str]:
-    if not d: return None
-    sd = "+" if d["delta_pct"] >= 0 else ""
-    return f"💵 <b>DXY</b> {d['level']:.2f} ({sd}{d['delta_pct']:.2f}%) · {d['extra']}"
 
 
 def fetch_spy_trend() -> Optional[dict]:
@@ -871,49 +642,6 @@ def fetch_spy_trend() -> Optional[dict]:
             "regime": regime, "extra": extra}
 
 
-def render_trend_line(t: Optional[dict]) -> Optional[str]:
-    if not t: return None
-    sign = "+" if t["pct_above"] >= 0 else ""
-    return (f"📈 <b>SPY</b> ${t['level']:.0f} ({sign}{t['pct_above']:.1f}% vs SMA200) "
-            f"— {t['regime']} · {t['extra']}")
-
-
-def render_vix_line(vix: Optional[dict]) -> Optional[str]:
-    """Format the VIX line. Returns None if fetch failed."""
-    if not vix:
-        return None
-    d = vix["delta"]; dp = vix["delta_pct"]
-    ds = "+" if d >= 0 else ""
-    suffix = f" · {vix['extra']}" if vix.get("extra") else ""
-    return (f"📊 <b>VIX</b> {vix['level']:.1f} ({ds}{d:.1f}, {ds}{dp:.1f}%) "
-            f"— {vix['regime']}{suffix}")
-
-
-def render_at_a_glance(total_value, total_cost, total_pnl, total_pct, alerts, weekly_delta,
-                       vix=None, yield_10y=None, dxy=None, spy_trend=None):
-    sign_tot = "+" if total_pnl >= 0 else ""
-    lines = [
-        f"<b>Total:</b> ${total_value:,.0f}  |  "
-        f"Cost ${total_cost:,.0f}  |  "
-        f"P&amp;L {sign_tot}${total_pnl:,.0f} ({sign_tot}{total_pct:.2f}%)"
-    ]
-    if weekly_delta is not None:
-        sd = "+" if weekly_delta >= 0 else ""
-        lines.append(f"<b>7-day Δ:</b> {sd}${weekly_delta:,.0f}")
-    for renderer, data in (
-        (render_vix_line, vix),
-        (render_yield_line, yield_10y),
-        (render_dxy_line, dxy),
-        (render_trend_line, spy_trend),
-    ):
-        line = renderer(data)
-        if line:
-            lines.append(line)
-    for a in alerts:
-        lines.append(f"🚨 {a}")
-    return "\n".join(lines)
-
-
 def render_time_sensitive(items, snapshots, rows_by_ticker, brief_lines):
     if not items:
         return None
@@ -942,112 +670,260 @@ def render_earnings_calendar(calendar):
     return "\n".join(out)
 
 
-def render_cluster_exposure(breakdown):
-    if not breakdown:
-        return None
-    out = ["<b>🎯 Cluster exposure</b>"]
-    for cl, val, pct, tickers in breakdown:
-        out.append(f"• <b>{cl}:</b> ${val:,.0f} ({pct:.1f}%) — {' '.join(tickers)}")
-    return "\n".join(out)
+# ── Market regime → how hard the action plan may add ──
+
+ADD_FRACTION = 0.15  # base add size, as a fraction of current shares
+
+REGIME_NORMAL = "normal"
+REGIME_CAUTION = "caution"
+REGIME_DEFENSIVE = "defensive"
+REGIME_BEAR = "bear"
 
 
-def render_position_block(tkr, sh, c, px, pnl, pct, ind, snap, brief_line, streak, weight, garp_score=None):
-    if px is None:
-        return f"<b>{tkr}</b>  {sh}@${c:.2f}  |  Last: unavailable"
+def classify_regime(vix: Optional[dict], spy_trend: Optional[dict]) -> tuple[str, str]:
+    """Combine SPY-vs-SMA200 and VIX into one regime that gates new adds.
 
-    sign = "+" if pnl >= 0 else ""
-    if c <= 0:
-        header = f"<b>{tkr}</b>  {sh} sh · house money (cost recovered)"
-        pct_str = ""
+    normal    — adds at full size
+    caution   — adds at half size          (SPY just below SMA200, or VIX 25–30)
+    defensive — avg-down adds paused, other adds at half size
+                                           (SPY ≥5% below SMA200, or VIX ≥30)
+    bear      — all adds paused            (SPY ≥10% below SMA200)
+    """
+    pct = spy_trend["pct_above"] if spy_trend else None
+    v = vix["level"] if vix else None
+    why = []
+    if pct is not None and pct < 0:
+        why.append(f"S&amp;P 500 {abs(pct):.1f}% below its 200-day average")
+    if v is not None and v >= 25:
+        why.append(f"VIX {v:.0f}")
+    reason = ", ".join(why)
+
+    if pct is not None and pct <= -10:
+        return REGIME_BEAR, reason
+    if (pct is not None and pct <= -5) or (v is not None and v >= 30):
+        return REGIME_DEFENSIVE, reason
+    if (pct is not None and pct < 0) or (v is not None and v >= 25):
+        return REGIME_CAUTION, reason
+    return REGIME_NORMAL, reason
+
+
+REGIME_RULES = {
+    REGIME_NORMAL: None,
+    REGIME_CAUTION: "🟡 <b>Caution mode</b> ({why}): adds at half size.",
+    REGIME_DEFENSIVE: "🛡️ <b>Defensive mode</b> ({why}): avg-down adds paused, other adds at half size.",
+    REGIME_BEAR: "🐻 <b>Bear-market mode</b> ({why}): all new adds paused.",
+}
+
+
+def _greeting(now_sgt: datetime.datetime) -> str:
+    h = now_sgt.hour
+    part = "morning" if h < 12 else ("afternoon" if h < 18 else "evening")
+    emoji = {"morning": "🌅", "afternoon": "☀️", "evening": "🌆"}[part]
+    day = f"{now_sgt.strftime('%a')} {now_sgt.day} {now_sgt.strftime('%b')}"
+    return (f"{emoji} <b>Good {part} sir</b> — here's your portfolio update for {day}. "
+            f"But before that, here's what changed in markets.")
+
+
+def render_markets_section(vix, yield_10y, dxy, spy_trend, regime) -> str:
+    lines = ["📊 <b><u>Markets</u></b>"]
+    if vix:
+        v, dp = vix["level"], vix["delta_pct"]
+        if v < 15:
+            mood = "fear is low"
+        elif v < 20:
+            mood = "volatility is normal"
+        elif v < 25:
+            mood = "volatility is elevated"
+        elif v < 30:
+            mood = "fear is high"
+        else:
+            mood = "fear is very high"
+        if dp <= -5:
+            mood += ", but easing"
+        elif dp >= 5:
+            mood += " and rising"
+        emoji = "😰" if v >= 25 else ("😐" if v >= 20 else "😌")
+        lines.append(f"• {emoji} <b>VIX</b> {v:.1f} ({dp:+.0f}%) — {mood}")
+    if yield_10y:
+        bps = round(yield_10y["delta_bps"]) + 0
+        if bps <= -5:
+            note = "rates falling, a tailwind for growth stocks"
+        elif bps >= 5:
+            note = "rates rising, a headwind for growth stocks"
+        else:
+            note = "little changed"
+        lines.append(f"• 💰 <b>10Y yield</b> {yield_10y['level']:.2f}% ({bps:+d}bps) — {note}")
+    if dxy:
+        dp = dxy["delta_pct"]
+        note = "flat" if abs(dp) < 0.1 else ("stronger" if dp > 0 else "weaker")
+        lines.append(f"• 💵 <b>Dollar (DXY)</b> {dxy['level']:.2f} ({dp:+.2f}%) — {note}")
+    if spy_trend:
+        pct = spy_trend["pct_above"]
+        side = "above" if pct >= 0 else "below"
+        emoji = "📈" if pct >= 0 else "📉"
+        lines.append(f"• {emoji} <b>S&amp;P 500 (SPY)</b> ${spy_trend['level']:.0f}, "
+                     f"{abs(pct):.1f}% {side} its 200-day average — {spy_trend['regime'].lower()}")
+
+    # One-line summary built from the same readings — no free text.
+    parts = []
+    if spy_trend:
+        r = spy_trend["regime"]
+        parts.append({
+            "Strong bull": "stocks are in a strong uptrend",
+            "Bull trend intact": "stocks are in an uptrend",
+            "Trend under pressure": "stocks are testing their long-term trend",
+            "Confirmed downtrend": "stocks are in a downtrend",
+            "Bear market": "stocks are in a bear market",
+        }.get(r, "the trend is unclear"))
+    if vix:
+        v = vix["level"]
+        if v >= 25:
+            parts.append("fear elevated" + (", though it eased today" if vix["delta_pct"] <= -5 else ""))
+        elif v < 15:
+            parts.append("volatility unusually calm")
+    if len(parts) == 2:
+        summary = f"{parts[0]}, with {parts[1]}"
     else:
-        header = f"<b>{tkr}</b>  {sh}@${c:.2f}"
-        pct_str = f"{sign}{pct:.1f}% "
-    lines = [
-        header,
-        f"💵 Px ${px:.2f} · {pct_str}({sign}${pnl:,.0f}) · {weight:.1f}% of book"
-    ]
-
-    # Streak / 7d delta as a single status line
-    extras = []
-    if streak.get("delta_7d") is not None:
-        d7 = streak["delta_7d"]
-        sd = "+" if d7 >= 0 else ""
-        d7p = streak.get("delta_pct_7d")
-        pp = f" ({sd}{d7p:.1f}%)" if d7p is not None else ""
-        extras.append(f"7d Δ {sd}${d7:,.0f}{pp}")
-    if streak.get("streak"):
-        arrow = "📈" if streak["streak_dir"] == "up" else "📉"
-        extras.append(f"{arrow} {streak['streak']} sessions {streak['streak_dir']}")
-    if extras:
-        lines.append("📊 " + " · ".join(extras))
-
-    # Entry / stop / take-profit levels
-    lv = compute_entry_levels(px, ind, snap.get("target_mean"))
-    tp_src = {"analyst PT": "street", "2R": "2R"}.get(lv.get("tp_source"), "")
-    tp_str = f"  |  Target ${lv['tp']:.2f} ({lv['upside']:+.1f}%, {tp_src})" if lv.get("tp") else ""
-    lines.append(
-        f"🎯 Entry ${lv['entry_low']:.2f}–${lv['entry_high']:.2f}"
-        f"  |  Stop ${lv['stop']:.2f}"
-        f"{tp_str}"
-        f"  <i>({lv['screen']})</i>"
-    )
-
-    # Read lines
-    for line in synthesize_read(tkr, px, ind, snap, brief_line):
-        lines.append(line)
-
-    # Earnings if present
-    if snap.get("earnings"):
-        lines.append("📅 " + snap["earnings"])
-
-    # GARP quality score (informational — not a buy/sell trigger)
-    if garp_score is not None:
-        lines.append(garp.render_line(garp_score))
-
+        summary = parts[0] if parts else "markets are mixed"
+    summary = summary[0].upper() + summary[1:] + "."
+    if yield_10y:
+        bps = yield_10y["delta_bps"]
+        if bps <= -5:
+            summary += " Falling yields are the one bright spot."
+        elif bps >= 5:
+            summary += " Rising yields add pressure on growth names."
+    summary += {
+        REGIME_NORMAL: " Conditions support standard sizing.",
+        REGIME_CAUTION: " It's a time to size new adds smaller.",
+        REGIME_DEFENSIVE: " The regime favours protecting capital over adding risk.",
+        REGIME_BEAR: " Preservation mode — no new adds.",
+    }[regime]
+    lines.append("")
+    lines.append(f"🧭 <b>Summary:</b> {summary}")
     return "\n".join(lines)
 
 
-def render_action_plan(scored_rows, prices):
-    """Concrete share-count actions for Trim / Buy positions."""
-    actions = []
+def render_portfolio_update(rows, total_value, total_cost, total_pnl, total_pct, weekly_delta,
+                            alerts, breakdown, time_sensitive_block) -> str:
+    def money(x):
+        return f"{'+' if x >= 0 else '-'}${abs(x):,.0f}"
+    lines = ["💼 <b><u>Portfolio Update</u></b>",
+             f"<b>${total_value:,.0f}</b> · P&amp;L {money(total_pnl)} ({total_pct:+.1f}%)"
+             + (f" · 7-day {money(weekly_delta)}" if weekly_delta is not None else "")]
+    for a in alerts:
+        lines.append(f"🚨 {a}")
+    if time_sensitive_block:
+        lines.append("")
+        lines.append(time_sensitive_block)
+
+    priced = [r for r in rows if r[3] is not None]
+    ranked = [r for r in priced if r[5] != float("inf")]
+    ranked.sort(key=lambda r: r[5], reverse=True)
+    if len(ranked) >= 2:
+        n = min(3, len(ranked) // 2)
+        lines.append("")
+        lines.append("📈 <b>Leaders:</b> " + " · ".join(f"{r[0]} {r[5]:+.0f}%" for r in ranked[:n]))
+        lines.append("📉 <b>Laggards:</b> " + " · ".join(f"{r[0]} {r[5]:+.0f}%" for r in ranked[::-1][:n]))
+
+    by_size = sorted(priced, key=lambda r: r[1] * r[3], reverse=True)
+    top, rest = by_size[:8], by_size[8:]
+    lines.append("")
+    lines.append("<i>By size of position</i>")
+    table = []
+    for tkr, sh, c, px, pnl, pct in top:
+        w = sh * px / total_value * 100 if total_value else 0
+        g = "house money" if pct == float("inf") else f"{pct:+.1f}%"
+        table.append(f"{tkr:<5} {w:5.1f}%  ${px:>8.2f}  {g}")
+    lines.append("<pre>" + html.escape("\n".join(table)) + "</pre>")
+    if rest:
+        lines.append(f"<i>+ {len(rest)} smaller ({', '.join(r[0] for r in rest)})</i>")
+
+    if breakdown:
+        lines.append("")
+        lines.append("<i>By cluster</i>")
+        for cl, val, pct, tickers in breakdown:
+            lines.append(f"• <b>{cl}:</b> ${val:,.0f} ({pct:.1f}%) — {' '.join(tickers)}")
+    return "\n".join(lines)
+
+
+def render_action_plan(scored_rows, regime: str, regime_why: str, rows, total_value: float):
+    """Share-count actions, gated by market regime and post-add concentration."""
+    rule = REGIME_RULES[regime]
+    trims, exits, avg_down, adds = [], [], [], []
+    paused, blocked, holds = [], [], []
+
+    # Running values so each add is checked against the book *after* earlier adds.
+    tkr_value = {r[0]: r[1] * r[3] for r in rows if r[3] is not None}
+    cl_value: dict[str, float] = {}
+    for t, v in tkr_value.items():
+        cl_value[classify(t)] = cl_value.get(classify(t), 0) + v
+    book = total_value
+
     for sr in scored_rows:
         tkr, bucket, reason, sh, c, px, pnl, pct, weight, snap, ind = sr
         if px is None:
             continue
         if bucket == "TRIM":
             trim = max(1, int(sh * 0.25))
-            cash = trim * px
-            actions.append(
-                f"<b>⬇ {tkr}:</b> trim {trim} (${cash:,.0f} proceeds) → {sh - trim} remain · {reason}"
-            )
-        elif bucket == "BUY":
-            add = max(1, int(sh * 0.15)) if sh > 0 else 1
-            cap = add * px
-            actions.append(
-                f"<b>🟢 {tkr}:</b> add {add} (${cap:,.0f} capital) → {sh + add} total · {reason}"
-            )
+            trims.append(f"{tkr} −{trim} (${trim * px:,.0f}) · {reason}")
         elif bucket == "EXIT":
-            cash = sh * px
-            actions.append(
-                f"<b>🚫 {tkr}:</b> exit {sh} (${cash:,.0f} proceeds) · {reason}"
-            )
-    if not actions:
-        return None
-    return "<b>📑 Auto Action Plan</b>\n" + "\n".join(actions)
+            exits.append(f"{tkr} all {sh} (${sh * px:,.0f}) · {reason}")
+        elif bucket == "BUY":
+            is_avg_down = reason.startswith("Underwater")
+            if regime == REGIME_BEAR or (regime == REGIME_DEFENSIVE and is_avg_down):
+                paused.append(tkr)
+                continue
+            frac = ADD_FRACTION if regime == REGIME_NORMAL else ADD_FRACTION / 2
+            add = max(1, int(sh * frac)) if sh > 0 else 1
+            cap = add * px
+            new_book = book + cap
+            t_after = (tkr_value.get(tkr, 0) + cap) / new_book * 100
+            cl = classify(tkr)
+            c_after = (cl_value.get(cl, 0) + cap) / new_book * 100
+            if t_after > SINGLE_NAME_THRESHOLD:
+                blocked.append(f"{tkr} (would be {t_after:.0f}% of book, limit {SINGLE_NAME_THRESHOLD:.0f}%)")
+                continue
+            if cl != "Other" and c_after > CLUSTER_THRESHOLD:
+                blocked.append(f"{tkr} (would take {cl} to {c_after:.0f}%, limit {CLUSTER_THRESHOLD:.0f}%)")
+                continue
+            tkr_value[tkr] = tkr_value.get(tkr, 0) + cap
+            cl_value[cl] = cl_value.get(cl, 0) + cap
+            book = new_book
+            (avg_down if is_avg_down else adds).append((tkr, add, cap))
+        else:
+            holds.append(f"{tkr} ({reason[len('Add blocked — '):]})" if reason.startswith("Add blocked") else tkr)
+
+    lines = ["📑 <b><u>Action Plan</u></b>"]
+    if rule:
+        lines.append(rule.format(why=regime_why or "risk-off signals"))
+    lines.append("⬇ <b>Trim:</b> " + (" · ".join(trims) if trims else "none"))
+    if exits:
+        lines.append("🚫 <b>Exit / re-validate:</b> " + " · ".join(exits))
+
+    def fmt(items):
+        return " · ".join(f"{t} +{n} (${cap:,.0f})" for t, n, cap in sorted(items, key=lambda x: -x[2]))
+
+    if avg_down:
+        lines.append("🟢 <b>Avg-down candidates</b> <i>(underwater + buy rating + oversold)</i>")
+        lines.append(f"   → {fmt(avg_down)}")
+    if adds:
+        lines.append("🟢 <b>Add on weakness</b> <i>(analyst upside + buy rating)</i>")
+        lines.append(f"   → {fmt(adds)}")
+    if paused:
+        lines.append(f"⏸ <b>Paused by market regime:</b> {', '.join(paused)}")
+    if blocked:
+        lines.append("🚧 <b>Blocked by concentration limits:</b> " + " · ".join(blocked))
+    if holds:
+        lines.append("⏸ <b>Hold:</b> " + ", ".join(holds))
+    total = sum(cap for _t, _n, cap in avg_down + adds)
+    lines.append(f"<i>Total if all executed: ~${total:,.0f} of new capital</i>" if total
+                 else "<i>No new capital suggested today.</i>")
+    return "\n".join(lines)
 
 
 def build_message(portfolio, prices, snapshots, indicators, history_state, brief_lines, date_str, session_label, history=None, garp_scores=None, vix=None, yield_10y=None, dxy=None, spy_trend=None):
     sgt = pytz.timezone("Asia/Singapore")
     now_sgt = datetime.datetime.now(sgt)
-    weekday = now_sgt.strftime("%a")
-
-    if session_label == "AM":
-        tagline = "Pre-market read"
-    else:
-        tagline = "Post-close review"
-
-    lines = [f"<b>💼 Portfolio Watch — {date_str} {session_label} ({weekday})</b>",
-             f"<i>{tagline}</i>", ""]
 
     positions = portfolio["positions"]
     total_cost = 0.0
@@ -1093,42 +969,36 @@ def build_message(portfolio, prices, snapshots, indicators, history_state, brief
 
     breakdown = cluster_breakdown(rows, total_value)
     alerts = concentration_alerts(rows, total_value, breakdown)
+    regime, regime_why = classify_regime(vix, spy_trend)
 
-    # ── At a glance ──
-    lines.append(render_at_a_glance(total_value, total_cost, total_pnl, total_pct, alerts, weekly_delta,
-                                     vix=vix, yield_10y=yield_10y, dxy=dxy, spy_trend=spy_trend))
+    lines = [_greeting(now_sgt), ""]
 
-    # ── Time-sensitive ──
+    # ── Markets ──
+    lines.append(render_markets_section(vix, yield_10y, dxy, spy_trend, regime))
+
+    # ── Portfolio update ──
     ts_items = filter_time_sensitive(snapshots, session_label)
-    block = render_time_sensitive(ts_items, snapshots, rows_by_ticker, brief_lines)
-    if block:
-        lines.append("")
-        lines.append(block)
+    ts_block = render_time_sensitive(ts_items, snapshots, rows_by_ticker, brief_lines)
+    lines.append("")
+    lines.append(render_portfolio_update(rows, total_value, total_cost, total_pnl, total_pct,
+                                         weekly_delta, alerts, breakdown, ts_block))
 
-    # ── Earnings calendar ──
+    # ── Earnings, grouped by play quality ──
     calendar = build_earnings_calendar(snapshots)
-    block = render_earnings_calendar(calendar)
-    if block:
-        lines.append("")
-        lines.append(block)
-
-    # ── Earnings Spotlight (broader S&P 100 awareness, factual cards) ──
-    if build_earnings_spotlight_section is not None:
+    if build_earnings_tiers_section is not None:
         try:
-            spotlight = build_earnings_spotlight_section()
-            if spotlight:
+            block = build_earnings_tiers_section(calendar)
+            if block:
                 lines.append("")
-                lines.append(spotlight)
+                lines.append(block)
         except Exception as e:
-            print(f"earnings spotlight section failed: {e}")
+            print(f"earnings section failed: {e}")
+            block = render_earnings_calendar(calendar)
+            if block:
+                lines.append("")
+                lines.append(block)
 
-    # ── Cluster exposure ──
-    block = render_cluster_exposure(breakdown)
-    if block:
-        lines.append("")
-        lines.append(block)
-
-    # ── Score and bucket positions ──
+    # ── Score positions → action plan ──
     over_clusters = {cl for cl, _v, pct, _t in breakdown if pct > CLUSTER_THRESHOLD}
     scored = []
     for tkr, sh, c, px, pnl, pct in rows:
@@ -1146,40 +1016,8 @@ def build_message(portfolio, prices, snapshots, indicators, history_state, brief
         )
         scored.append((tkr, bucket, reason, sh, c, px, pnl, pct, weight, snap, ind))
 
-    # Group by bucket
-    by_bucket = {"TRIM": [], "EXIT": [], "BUY": [], "HOLD": []}
-    for sr in scored:
-        by_bucket.setdefault(sr[1], []).append(sr)
-
-    # ── Position breakdown by bucket ──
     lines.append("")
-    lines.append("<b>📋 Position breakdown</b>")
-    for bucket in ["TRIM", "EXIT", "BUY", "HOLD"]:
-        items = by_bucket.get(bucket, [])
-        if not items:
-            continue
-        emoji, label = BUCKET_META[bucket]
-        lines.append("")
-        lines.append(f"<b>{emoji} {label}</b>")
-        for sr in items:
-            tkr, _b, reason, sh, c, px, pnl, pct, weight, snap, ind = sr
-            streak = compute_streak_and_delta(history_state, tkr, px, sh) if px else {}
-            block = render_position_block(
-                tkr, sh, c, px, pnl, pct, ind, snap,
-                brief_lines.get(tkr), streak or {}, weight,
-                garp_score=(garp_scores or {}).get(tkr),
-            )
-            playbook = synthesize_playbook(tkr, bucket, reason, px, c, ind, snap) if px else ""
-            lines.append("")
-            lines.append(block)
-            if playbook:
-                lines.append(playbook)
-
-    # ── Action plan (summary of position breakdown — keep adjacent) ──
-    plan = render_action_plan(scored, prices)
-    if plan:
-        lines.append("")
-        lines.append(plan)
+    lines.append(render_action_plan(scored, regime, regime_why, rows, total_value))
 
     # ── Weekly GARP hunt list (Monday AM only — fundamentals move quarterly, not daily) ──
     if now_sgt.weekday() == 0 and session_label == "AM":
@@ -1198,10 +1036,10 @@ def build_message(portfolio, prices, snapshots, indicators, history_state, brief
         except Exception as e:
             print(f"GARP hunt list skipped: {e}")
 
-    # ── Portfolio diagnostics (factual, not trim/exit calls) ──
+    # ── Correlated pairs (leaders/laggards already shown in Portfolio Update) ──
     if build_diagnostics_section is not None:
         try:
-            diag_section = build_diagnostics_section(portfolio, prices, history)
+            diag_section = build_diagnostics_section(portfolio, prices, history, include_leaderboard=False)
             if diag_section:
                 lines.append("")
                 lines.append(diag_section)
