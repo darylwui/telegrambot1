@@ -441,12 +441,19 @@ def score_position(px, target_mean, pnl_pct, rating_score, portfolio_pct, rsi, e
 
     # BUY signals
     buy_reason = None
-    if pnl_pct <= -25 and rating_score >= 2 and (rsi is None or rsi < 40):
-        buy_reason = f"Underwater {pnl_pct:.0f}% + buy rating + RSI {rsi or 'na'} = avg-down zone"
+    if pnl_pct <= -25 and rating_score >= 2:
+        # Only after the stock has stopped falling (back above its 20-day avg — checked below).
+        buy_reason = f"Underwater {pnl_pct:.0f}% + buy rating, back above 20-day avg"
     elif upside >= 25 and rating_score >= 2:
         buy_reason = f"+{upside:.0f}% upside + buy rating"
     elif upside >= 15 and rating_score >= 2 and portfolio_pct < 3:
         buy_reason = f"+{upside:.0f}% upside, micro position ({portfolio_pct:.1f}%)"
+
+    if buy_reason and pnl_pct <= AVG_DOWN_REVIEW_PCT:
+        return "HOLD", f"Review — {pnl_pct:.0f}%, re-check the thesis before adding"
+    if buy_reason and pnl_pct <= -25 and sma20_ext is not None and sma20_ext < 0:
+        sma20_px = px / (1 + sma20_ext / 100)
+        return "HOLD", f"Falling — wait for a close above ${sma20_px:,.2f}"
 
     if buy_reason:
         if cluster_over:
@@ -846,11 +853,24 @@ def render_portfolio_update(rows, total_value, total_cost, total_pnl, total_pct,
     return "\n".join(lines)
 
 
+AVG_DOWN_REVIEW_PCT = -50  # this far underwater → re-check the thesis, never auto-add
+UPSIDE_RANK_CAP = 50      # outlier analyst targets shouldn't jump the queue
+DO_TODAY_MAX = 3          # adds surfaced as today's moves; the rest go to "if you have more cash"
+NO_CHASE_PCT = 2          # skip a buy if it opens this much above the limit
+
+
 def render_action_plan(scored_rows, regime: str, regime_why: str, rows, total_value: float):
-    """Share-count actions, gated by market regime and post-add concentration."""
+    """Share-count actions, gated by market regime and post-add concentration.
+
+    Returns (action_plan_text, bottom_line_text). Adds are ranked by analyst upside;
+    the top few become "Do today" with a limit price, the rest are optional.
+    """
     rule = REGIME_RULES[regime]
-    trims, exits, avg_down, adds = [], [], [], []
-    paused, blocked, holds = [], [], []
+    sells, buys = [], []           # sells: (tkr, verb, n, cap, px, why); buys: dict
+    paused, blocked = [], []
+    hold_groups: dict[str, list] = {}
+    earnings_soon = []             # (days, tkr)
+    falling, review = [], []       # underwater buy-rated names not yet fit to add
 
     # Running values so each add is checked against the book *after* earlier adds.
     tkr_value = {r[0]: r[1] * r[3] for r in rows if r[3] is not None}
@@ -859,15 +879,30 @@ def render_action_plan(scored_rows, regime: str, regime_why: str, rows, total_va
         cl_value[classify(t)] = cl_value.get(classify(t), 0) + v
     book = total_value
 
-    for sr in scored_rows:
+    def upside_of(snap, px):
+        tm = snap.get("target_mean")
+        return (tm - px) / px * 100 if (tm and px) else None
+
+    # Rank buy candidates by upside first, so the concentration budget goes to the best ideas.
+    def rank_key(sr):
+        # Trend-confirmed adds before avg-downs, then by (capped) upside.
+        up = upside_of(sr[9] or {}, sr[5])
+        up = min(up, UPSIDE_RANK_CAP) if up is not None else -999
+        return (sr[2].startswith("Underwater"), -up)
+
+    for sr in sorted(scored_rows, key=rank_key):
         tkr, bucket, reason, sh, c, px, pnl, pct, weight, snap, ind = sr
+        snap = snap or {}
+        ed = snap.get("earnings_days")
+        if ed is not None and 0 <= ed <= 7:
+            earnings_soon.append((ed, tkr))
         if px is None:
             continue
         if bucket == "TRIM":
-            trim = max(1, int(sh * 0.25))
-            trims.append(f"{tkr} −{trim} (${trim * px:,.0f}) · {reason}")
+            n = max(1, int(sh * 0.25))
+            sells.append((tkr, "sell", n, n * px, px, reason))
         elif bucket == "EXIT":
-            exits.append(f"{tkr} all {sh} (${sh * px:,.0f}) · {reason}")
+            sells.append((tkr, "sell all", sh, sh * px, px, reason))
         elif bucket == "BUY":
             is_avg_down = reason.startswith("Underwater")
             if regime == REGIME_BEAR or (regime == REGIME_DEFENSIVE and is_avg_down):
@@ -889,36 +924,95 @@ def render_action_plan(scored_rows, regime: str, regime_why: str, rows, total_va
             tkr_value[tkr] = tkr_value.get(tkr, 0) + cap
             cl_value[cl] = cl_value.get(cl, 0) + cap
             book = new_book
-            (avg_down if is_avg_down else adds).append((tkr, add, cap))
+            up = upside_of(snap, px)
+            if is_avg_down:
+                why = f"avg-down: {pct:.0f}% underwater but back above its 20-day avg"
+                if up is not None:
+                    why += f", {up:+.0f}% to target"
+            else:
+                why = f"{up:+.0f}% to analyst target" if up is not None else reason
+            buys.append({"tkr": tkr, "n": add, "cap": cap, "px": px, "why": why})
         else:
-            holds.append(f"{tkr} ({reason[len('Add blocked — '):]})" if reason.startswith("Add blocked") else tkr)
+            if reason.startswith("Add blocked"):
+                r = reason[len("Add blocked — "):]
+                if r.startswith("earnings in"):
+                    continue          # surfaced under "Before you act"
+                hold_groups.setdefault(r, []).append(tkr)
+            elif reason.startswith("Falling — "):
+                falling.append(f"{tkr} ({pct:.0f}%, close above ${reason.rsplit('$', 1)[1]})")
+            elif reason.startswith("Review — "):
+                review.append(f"{tkr} {pct:.0f}%")
+            else:
+                hold_groups.setdefault("", []).append(tkr)
+
+    do_today, optional = buys[:DO_TODAY_MAX], buys[DO_TODAY_MAX:]
 
     lines = ["📑 <b><u>Action Plan</u></b>"]
     if rule:
         lines.append(rule.format(why=regime_why or "risk-off signals"))
-    lines.append("⬇ <b>Trim:</b> " + (" · ".join(trims) if trims else "none"))
-    if exits:
-        lines.append("🚫 <b>Exit / re-validate:</b> " + " · ".join(exits))
+    lines.append("")
 
-    def fmt(items):
-        return " · ".join(f"{t} +{n} (${cap:,.0f})" for t, n, cap in sorted(items, key=lambda x: -x[2]))
+    step = 0
+    if sells or do_today:
+        lines.append("✅ <b>Do today</b>")
+        for tkr, verb, n, cap, px, why in sells:
+            step += 1
+            lines.append(f"{step}. <b>{tkr}</b> — {verb} {n} at ≥ ${px:,.2f} (~${cap:,.0f}) · {why}")
+        for b in do_today:
+            step += 1
+            lines.append(f"{step}. <b>{b['tkr']}</b> — buy {b['n']} at ≤ ${b['px']:,.2f} "
+                         f"(~${b['cap']:,.0f}) · {b['why']}")
+        if do_today:
+            lines.append(f"<i>Limit = last price. Skip a buy if it opens more than {NO_CHASE_PCT}% higher — don't chase.</i>")
+    else:
+        lines.append("✅ <b>Do today:</b> nothing — sit tight.")
 
-    if avg_down:
-        lines.append("🟢 <b>Avg-down candidates</b> <i>(underwater + buy rating + oversold)</i>")
-        lines.append(f"   → {fmt(avg_down)}")
-    if adds:
-        lines.append("🟢 <b>Add on weakness</b> <i>(analyst upside + buy rating)</i>")
-        lines.append(f"   → {fmt(adds)}")
+    if optional:
+        lines.append("")
+        opt_total = sum(b["cap"] for b in optional)
+        lines.append(f"➕ <b>If you have more cash</b> (~${opt_total:,.0f}): "
+                     + " · ".join(f"{b['tkr']} +{b['n']} (${b['cap']:,.0f})" for b in optional))
+
+    if earnings_soon:
+        earnings_soon.sort()
+        lines.append("")
+        lines.append("📅 <b>Before you act:</b> " + " · ".join(
+            f"{t} reports {'today' if d == 0 else ('tomorrow' if d == 1 else f'in {d}d')}"
+            for d, t in earnings_soon) + " — no adds until after the print.")
+    if falling:
+        lines.append("🔪 <b>Still falling — don't catch the knife:</b> " + " · ".join(falling))
+    if review:
+        lines.append("🔍 <b>Re-check the thesis before adding:</b> " + " · ".join(review))
     if paused:
         lines.append(f"⏸ <b>Paused by market regime:</b> {', '.join(paused)}")
     if blocked:
         lines.append("🚧 <b>Blocked by concentration limits:</b> " + " · ".join(blocked))
-    if holds:
-        lines.append("⏸ <b>Hold:</b> " + ", ".join(holds))
-    total = sum(cap for _t, _n, cap in avg_down + adds)
-    lines.append(f"<i>Total if all executed: ~${total:,.0f} of new capital</i>" if total
-                 else "<i>No new capital suggested today.</i>")
-    return "\n".join(lines)
+    if hold_groups:
+        parts = []
+        for r, ts in hold_groups.items():
+            parts.append(", ".join(ts) + (f" ({r})" if r else ""))
+        lines.append("💤 <b>Just hold:</b> " + " · ".join(parts))
+
+    today_cap = sum(b["cap"] for b in do_today)
+    total = today_cap + sum(b["cap"] for b in optional)
+    if total:
+        lines.append(f"<i>Today ~${today_cap:,.0f} · all ideas ~${total:,.0f} of new capital</i>")
+
+    # One-line bottom line for the top of the message.
+    bits = []
+    if sells:
+        bits.append(f"{len(sells)} {'sell' if len(sells) == 1 else 'sells'} ({', '.join(s[0] for s in sells)})")
+    if do_today:
+        bits.append(f"{len(do_today)} {'buy' if len(do_today) == 1 else 'buys'} ~${today_cap:,.0f} "
+                    f"({', '.join(b['tkr'] for b in do_today)})")
+    if not bits:
+        headline = "🎯 <b>Today:</b> no action needed — just hold."
+    else:
+        headline = "🎯 <b>Today:</b> " + " · ".join(bits)
+        if not sells:
+            headline += " · no trims"
+        headline += ". Details in the Action Plan below."
+    return "\n".join(lines), headline
 
 
 def build_message(portfolio, prices, snapshots, indicators, history_state, brief_lines, date_str, session_label, history=None, garp_scores=None, vix=None, yield_10y=None, dxy=None, spy_trend=None):
@@ -971,7 +1065,7 @@ def build_message(portfolio, prices, snapshots, indicators, history_state, brief
     alerts = concentration_alerts(rows, total_value, breakdown)
     regime, regime_why = classify_regime(vix, spy_trend)
 
-    lines = [_greeting(now_sgt), ""]
+    lines = [_greeting(now_sgt), "", None, ""]   # slot 2 = bottom line, filled after scoring
 
     # ── Markets ──
     lines.append(render_markets_section(vix, yield_10y, dxy, spy_trend, regime))
@@ -1016,8 +1110,10 @@ def build_message(portfolio, prices, snapshots, indicators, history_state, brief
         )
         scored.append((tkr, bucket, reason, sh, c, px, pnl, pct, weight, snap, ind))
 
+    plan_text, headline = render_action_plan(scored, regime, regime_why, rows, total_value)
+    lines[2] = headline
     lines.append("")
-    lines.append(render_action_plan(scored, regime, regime_why, rows, total_value))
+    lines.append(plan_text)
 
     # ── Weekly GARP hunt list (Monday AM only — fundamentals move quarterly, not daily) ──
     if now_sgt.weekday() == 0 and session_label == "AM":
